@@ -2,80 +2,84 @@
 <html lang="bg">
 <head>
     <meta charset="UTF-8">
-    <title>AI Music Suite - Cyberpunk Visualizer</title>
+    <title>AI Music Suite - Extreme Visualizer</title>
     <style>
-        body { margin: 0; background: #050505; color: #fff; font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; overflow: hidden; }
-        .controls { position: absolute; top: 20px; z-index: 10; display: flex; gap: 15px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 50px; border: 1px solid #444; }
-        button { background: #ff0055; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
-        canvas { width: 100vw; height: 100vh; cursor: crosshair; }
+        body { margin: 0; background: #000; overflow: hidden; color: #fff; font-family: 'Arial Black', sans-serif; }
+        #canvas { display: block; }
+        .ui { position: absolute; top: 20px; left: 20px; z-index: 10; display: flex; gap: 15px; background: rgba(0,0,0,0.7); padding: 20px; border-left: 5px solid #00f2ff; }
+        button { background: #00f2ff; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        button:hover { background: #fff; }
     </style>
 </head>
 <body>
-    <div class="controls">
-        <input type="file" id="audioUpload" hidden>
-        <button onclick="document.getElementById('audioUpload').click()">🎵 Качи песен</button>
-        <button id="recordBtn">🔴 Запис</button>
+    <div class="ui">
+        <input type="file" id="upload" hidden>
+        <button onclick="document.getElementById('upload').click()">Load Track</button>
+        <button id="record">Record (WebM)</button>
     </div>
-    <canvas id="visualizerCanvas"></canvas>
+    <canvas id="canvas"></canvas>
 
     <script>
-        const canvas = document.getElementById('visualizerCanvas');
+        const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        let audioCtx, analyser, source, mediaRecorder, chunks = [];
-        let particles = [];
+        let audio, analyser, dataArray, source, audioCtx;
+        let recording = false;
+        let mediaRecorder, chunks = [];
 
-        document.getElementById('audioUpload').onchange = (e) => {
-            if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const audio = new Audio(URL.createObjectURL(e.target.files[0]));
+        document.getElementById('upload').onchange = (e) => {
+            if(!audioCtx) audioCtx = new AudioContext();
+            audio = new Audio(URL.createObjectURL(e.target.files[0]));
             source = audioCtx.createMediaElementSource(audio);
             analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 512;
             source.connect(analyser);
             analyser.connect(audioCtx.destination);
-            analyser.fftSize = 512;
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
             audio.play();
-            draw();
+            render();
         };
 
-        function draw() {
-            requestAnimationFrame(draw);
-            const data = new Uint8Array(analyser.frequencyBinCount);
-            analyser.getByteFrequencyData(data);
+        function render() {
+            requestAnimationFrame(render);
+            analyser.getByteFrequencyData(dataArray);
             
-            ctx.fillStyle = 'rgba(5, 5, 5, 0.15)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            ctx.shadowBlur = 15;
-            for(let i = 0; i < data.length; i++) {
-                const val = data[i];
-                const x = (i / data.length) * canvas.width;
-                const y = canvas.height - (val * (canvas.height / 255));
-                
-                ctx.fillStyle = `hsl(${i + 200}, 80%, 60%)`;
-                ctx.shadowColor = ctx.fillStyle;
-                ctx.fillRect(x, y, canvas.width / data.length - 2, val * 2);
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.fillRect(0,0, canvas.width, canvas.height);
+
+            const cx = canvas.width/2, cy = canvas.height/2;
+            for(let i=0; i<dataArray.length; i++) {
+                const r = dataArray[i] * 1.5;
+                const angle = i * 0.1;
+                ctx.beginPath();
+                ctx.strokeStyle = `hsl(${i + Date.now()/50}, 100%, 50%)`;
+                ctx.lineWidth = 3;
+                ctx.arc(cx, cy, r, angle, angle + 0.2);
+                ctx.stroke();
             }
         }
 
-        document.getElementById('recordBtn').onclick = (e) => {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                e.target.innerText = "🔴 Запис";
-            } else {
+        document.getElementById('record').onclick = (e) => {
+            if(!recording) {
                 chunks = [];
                 const stream = canvas.captureStream(60);
                 mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
                 mediaRecorder.ondataavailable = e => chunks.push(e.data);
                 mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.href = URL.createObjectURL(new Blob(chunks));
-                    a.download = 'cyberpunk_viz.webm';
-                    a.click();
+                    a.href = url; a.download = 'EXTREME_VISUALS.webm'; a.click();
                 };
                 mediaRecorder.start();
-                e.target.innerText = "⏹ Спри";
+                e.target.innerText = "Recording...";
+                recording = true;
+            } else {
+                mediaRecorder.stop();
+                e.target.innerText = "Record (WebM)";
+                recording = false;
             }
         };
     </script>
