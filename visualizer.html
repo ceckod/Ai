@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Music Suite - Professional Visualizer</title>
+    <style>
+        :root { --bg: #0a0a0c; --panel: rgba(255, 255, 255, 0.05); --accent: #ff007a; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .header { text-align: center; margin: 20px 0; }
+        .container { width: 90%; max-width: 1000px; background: var(--panel); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; }
+        button, select { background: var(--accent); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        canvas { width: 100%; height: auto; background: #000; border-radius: 10px; box-shadow: 0 0 30px rgba(255,0,122,0.3); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Pro Neon Visualizer</h1>
+        <p>Качи песен -> Стартирай запис -> Изтегли WebM</p>
+    </div>
+    <div class="container">
+        <div class="controls">
+            <input type="file" id="audioUpload" accept="audio/*" hidden>
+            <button onclick="document.getElementById('audioUpload').click()">📁 Качи песен</button>
+            <select id="aspectRatio">
+                <option value="16:9">YouTube (16:9)</option>
+                <option value="9:16">Shorts (9:16)</option>
+            </select>
+            <button id="recordBtn">🔴 Започни запис</button>
+        </div>
+        <canvas id="visualizerCanvas" width="1920" height="1080"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('visualizerCanvas');
+        const ctx = canvas.getContext('2d');
+        const audio = new Audio();
+        let audioCtx, analyser, source, mediaRecorder, chunks = [];
+
+        document.getElementById('audioUpload').onchange = (e) => {
+            if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            audio.src = URL.createObjectURL(e.target.files[0]);
+            source = audioCtx.createMediaElementSource(audio);
+            analyser = audioCtx.createAnalyser();
+            source.connect(analyser);
+            analyser.connect(audioCtx.destination);
+            analyser.fftSize = 256;
+            audio.play();
+            draw();
+        };
+
+        function draw() {
+            requestAnimationFrame(draw);
+            const data = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(data);
+            
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            for(let i=0; i<data.length; i++) {
+                const angle = (i / data.length) * Math.PI * 2;
+                const r = 100 + (data[i] * 1.5);
+                const x = centerX + Math.cos(angle) * r;
+                const y = centerY + Math.sin(angle) * r;
+                
+                ctx.beginPath();
+                ctx.arc(x, y, data[i]/15, 0, Math.PI * 2);
+                ctx.fillStyle = `hsl(${i * 2}, 100%, 50%)`;
+                ctx.fill();
+            }
+        }
+
+        document.getElementById('recordBtn').onclick = (e) => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                e.target.innerText = "🔴 Започни запис";
+            } else {
+                chunks = [];
+                const stream = canvas.captureStream(60);
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'visualizer_output.webm';
+                    a.click();
+                };
+                mediaRecorder.start();
+                e.target.innerText = "⏹ Спри запис";
+            }
+        };
+
+        document.getElementById('aspectRatio').onchange = (e) => {
+            if(e.target.value === '9:16') { canvas.width = 1080; canvas.height = 1920; }
+            else { canvas.width = 1920; canvas.height = 1080; }
+        };
+    </script>
+</body>
+</html>
