@@ -4,108 +4,91 @@
     <meta charset="UTF-8">
     <title>AI Music Suite - Professional Visualizer</title>
     <style>
-        :root { --bg: #0a0a0c; --accent: #7000ff; --text: #fff; }
-        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        .header { text-align: center; margin: 20px; }
-        .status { font-size: 0.85rem; color: #4CAF50; display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 5px; }
-        .container { width: 90%; max-width: 1000px; background: rgba(255,255,255,0.05); backdrop-filter: blur(15px); border-radius: 20px; padding: 20px; border: 1px solid rgba(255,255,255,0.1); }
-        .controls { display: flex; gap: 15px; margin-bottom: 20px; justify-content: center; flex-wrap: wrap; }
-        button, select { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        canvas { width: 100%; height: auto; background: #000; border-radius: 15px; border: 1px solid var(--accent); }
+        :root { --bg: #0a0a0c; --panel: rgba(255, 255, 255, 0.05); --accent: #7000ff; }
+        body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .header { text-align: center; margin: 20px 0; }
+        .status { font-size: 0.8rem; color: #4CAF50; display: flex; align-items: center; gap: 5px; justify-content: center; }
+        .container { width: 90%; max-width: 1000px; background: var(--panel); backdrop-filter: blur(15px); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; }
+        button, select { background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
+        canvas { width: 100%; height: auto; background: #000; border-radius: 10px; }
     </style>
 </head>
 <body>
-
-<div class="header">
-    <h1>AI Асистент</h1>
-    <div class="status"><span>🟢</span> System Ready</div>
-</div>
-
-<div class="container">
-    <div class="controls">
-        <input type="file" id="audioUpload" accept="audio/*" hidden>
-        <button onclick="document.getElementById('audioUpload').click()">Зареди Аудио</button>
-        <select id="aspectRatio">
-            <option value="16:9">16:9 (YouTube)</option>
-            <option value="9:16">9:16 (Shorts)</option>
-        </select>
-        <button id="recBtn">Започни Запис</button>
+    <div class="header">
+        <h1>AI Асистент</h1>
+        <div class="status">🟢 System Ready</div>
     </div>
-    <canvas id="canvas"></canvas>
-</div>
+    <div class="container">
+        <div class="controls">
+            <input type="file" id="audioUpload" accept="audio/*" hidden>
+            <button onclick="document.getElementById('audioUpload').click()">Зареди MP3/WAV</button>
+            <select id="aspectRatio">
+                <option value="16:9">16:9 (YouTube)</option>
+                <option value="9:16">9:16 (Shorts)</option>
+            </select>
+            <button id="recordBtn">Започни запис (WebM)</button>
+        </div>
+        <canvas id="visualizerCanvas" width="1920" height="1080"></canvas>
+    </div>
 
-<audio id="audio" hidden></audio>
+    <script>
+        const canvas = document.getElementById('visualizerCanvas');
+        const ctx = canvas.getContext('2d');
+        const audio = new Audio();
+        let audioCtx, analyser, source, mediaRecorder, chunks = [];
 
-<script>
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const audio = document.getElementById('audio');
-    const audioUpload = document.getElementById('audioUpload');
-    const recBtn = document.getElementById('recBtn');
-    let audioCtx, analyser, dataArray, source, recorder, chunks = [];
-
-    function setupCanvas() {
-        const ratio = document.getElementById('aspectRatio').value;
-        canvas.width = 1920;
-        canvas.height = ratio === '16:9' ? 1080 : 3413;
-    }
-
-    document.getElementById('aspectRatio').onchange = setupCanvas;
-    setupCanvas();
-
-    audioUpload.onchange = function() {
-        const files = this.files;
-        audio.src = URL.createObjectURL(files[0]);
-        audio.load();
-        if(!audioCtx) {
+        document.getElementById('audioUpload').onchange = (e) => {
+            audio.src = URL.createObjectURL(e.target.files[0]);
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioCtx.createAnalyser();
             source = audioCtx.createMediaElementSource(audio);
             source.connect(analyser);
             analyser.connect(audioCtx.destination);
             analyser.fftSize = 512;
-            dataArray = new Uint8Array(analyser.frequencyBinCount);
+            audio.play();
             draw();
-        }
-        audio.play();
-    };
+        };
 
-    function draw() {
-        requestAnimationFrame(draw);
-        analyser.getByteFrequencyData(dataArray);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = '#7000ff';
-        ctx.fillStyle = '#7000ff';
-
-        const barWidth = (canvas.width / dataArray.length) * 2.5;
-        for(let i = 0; i < dataArray.length; i++) {
-            let barHeight = (dataArray[i] / 255) * canvas.height;
-            ctx.fillRect(i * barWidth, canvas.height - barHeight, barWidth - 2, barHeight);
+        function draw() {
+            requestAnimationFrame(draw);
+            const data = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(data);
+            ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.shadowBlur = 20; ctx.shadowColor = '#7000ff';
+            ctx.fillStyle = '#7000ff';
+            for(let i=0; i<data.length; i++) {
+                let h = (data[i] / 255) * canvas.height * 0.5;
+                ctx.fillRect(i * (canvas.width/data.length), canvas.height - h, (canvas.width/data.length)-2, h);
+            }
         }
-    }
 
-    recBtn.onclick = () => {
-        if(recorder && recorder.state === "recording") {
-            recorder.stop();
-            recBtn.innerText = "Започни Запис";
-        } else {
-            chunks = [];
-            recorder = new MediaRecorder(canvas.captureStream(60), { mimeType: 'video/webm' });
-            recorder.ondataavailable = e => chunks.push(e.data);
-            recorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'video/webm' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = 'visualizer.webm';
-                a.click();
-            };
-            recorder.start();
-            recBtn.innerText = "Спри Запис";
-        }
-    };
-</script>
+        document.getElementById('recordBtn').onclick = (e) => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                e.target.innerText = "Започни запис (WebM)";
+            } else {
+                chunks = [];
+                const stream = canvas.captureStream(60);
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'visualizer.webm';
+                    a.click();
+                };
+                mediaRecorder.start();
+                e.target.innerText = "Спри запис";
+            }
+        };
+
+        document.getElementById('aspectRatio').onchange = (e) => {
+            if(e.target.value === '9:16') { canvas.width = 1080; canvas.height = 1920; }
+            else { canvas.width = 1920; canvas.height = 1080; }
+        };
+    </script>
 </body>
 </html>
