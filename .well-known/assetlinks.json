@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.helfy.plastics.app",
+      "sha256_cert_fingerprints": [
+        "FILL_IN_AFTER_CREATING_THE_SIGNING_KEYSTORE_SEE_README"
+      ]
+    }
+  }
+]
