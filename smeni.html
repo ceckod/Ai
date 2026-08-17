@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Helfy Plastics — График на смени</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --bg: #0b1220;
+    --surface: #131c2e;
+    --surface-2: #1b2740;
+    --line: #263252;
+    --accent: #4fd1c5;   /* day */
+    --amber: #ffb347;
+    --night: #0a0e18;    /* night cell */
+    --night-text: #cdd6e8;
+    --rest: #1b2740;     /* rest cell */
+    --text: #e7ecef;
+    --text-dim: #8e9bb3;
+    --font-display: "Space Grotesk", sans-serif;
+    --font-body: "Inter", sans-serif;
+    --font-mono: "IBM Plex Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    padding: 20px 16px 60px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+
+  header.page {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  .sub {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin: 4px 0 0;
+  }
+
+  /* tabs */
+  .tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .tab {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 9px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .tab.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(79, 209, 197, 0.08);
+  }
+
+  /* month nav */
+  .month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin-bottom: 16px;
+  }
+  .month-nav button {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--text);
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  .month-nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .month-label {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.1rem;
+    min-width: 180px;
+    text-align: center;
+  }
+
+  /* legend */
+  .legend {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .dot.day { background: var(--accent); }
+  .dot.night { background: #000; border: 1px solid var(--line); }
+  .dot.rest { background: var(--rest); border: 1px solid var(--line); }
+
+  /* grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+  }
+  .dow {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    padding-bottom: 6px;
+    letter-spacing: 0.04em;
+  }
+  .dow.weekend { color: var(--amber); }
+
+  .cell {
+    border-radius: 10px;
+    padding: 8px 6px;
+    min-height: 74px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .cell.outside { opacity: 0.25; }
+  .cell .num {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-dim);
+  }
+  .cell.today .num {
+    color: var(--bg);
+    background: var(--amber);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+  }
+
+  /* single-shift mode cell coloring */
+  .cell.day-shift { background: var(--accent); border-color: var(--accent); }
+  .cell.day-shift .num, .cell.day-shift .badge { color: #06201d; }
+  .cell.night-shift { background: var(--night); border-color: #000; }
+  .cell.night-shift .num, .cell.night-shift .badge { color: var(--night-text); }
+  .cell.rest-shift { background: var(--surface-2); }
+
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+  }
+
+  /* all-shifts mode: mini badges per team */
+  .team-row { display: flex; flex-wrap: wrap; gap: 3px; margin-top: auto; }
+  .team-chip {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    font-weight: 600;
+    padding: 1px 4px;
+    border-radius: 4px;
+    line-height: 1.4;
+  }
+  .team-chip.day { background: var(--accent); color: #06201d; }
+  .team-chip.night { background: #000; color: var(--night-text); border: 1px solid var(--line); }
+  .team-chip.rest { background: transparent; color: var(--text-dim); border: 1px solid var(--line); }
+
+  @media (max-width: 640px) {
+    .cell { min-height: 60px; padding: 6px 4px; }
+    .dow { font-size: 0.62rem; }
+    .team-chip { font-size: 0.56rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <div>
+      <h1>График на смени</h1>
+      <p class="sub">Смени А · Б · Ц · Д — ротация на 8 дни</p>
+    </div>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="month-nav">
+    <button id="prevBtn" aria-label="Предишен месец">‹</button>
+    <div class="month-label" id="monthLabel"></div>
+    <button id="nextBtn" aria-label="Следващ месец">›</button>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot day"></span>Дневна</span>
+    <span><span class="dot night"></span>Нощна</span>
+    <span><span class="dot rest"></span>Почивка</span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+  // ------- изчисляване на смените -------
+  // База (8-дневен цикъл): Ден,Ден,Почивка,Почивка,Нощ,Нощ,Почивка,Почивка
+  // А, Б, Ц, Д са същата база, изместена на 2 дни всяка спрямо предходната.
+  const BASE = ["D", "D", "R", "R", "N", "N", "R", "R"];
+  const OFFSETS = { "Ц": 0, "А": 2, "Д": 4, "Б": 6 };
+  const EPOCH = Date.UTC(2026, 6, 27); // 27 юли 2026 = индекс 0 за Ц
+  const DAY_MS = 86400000;
+
+  function shiftType(team, dateUTCms) {
+    const daysSince = Math.round((dateUTCms - EPOCH) / DAY_MS);
+    const idx = (((daysSince + OFFSETS[team]) % 8) + 8) % 8;
+    return BASE[idx];
+  }
+
+  const TEAM_ORDER = ["А", "Б", "Ц", "Д"];
+  const TYPE_LABEL = { D: "Ден", N: "Нощ", R: "Почивка" };
+  const MONTH_NAMES = ["Януари","Февруари","Март","Април","Май","Юни","Юли","Август","Септември","Октомври","Ноември","Декември"];
+  const DOW = ["Пн","Вт","Ср","Чт","Пт","Сб","Нд"];
+
+  let currentView = "all"; // "all" | "А" | "Б" | "Ц" | "Д"
+  let viewDate = new Date(); // local "today" for cursor
+
+  // ------- тагове -------
+  const tabsEl = document.getElementById("tabs");
+  function renderTabs() {
+    const opts = [["all","Всички"], ["А","Смяна А"], ["Б","Смяна Б"], ["Ц","Смяна Ц"], ["Д","Смяна Д"]];
+    tabsEl.innerHTML = "";
+    opts.forEach(([key, label]) => {
+      const btn = document.createElement("button");
+      btn.className = "tab" + (currentView === key ? " active" : "");
+      btn.textContent = label;
+      btn.onclick = () => { currentView = key; renderTabs(); renderGrid(); };
+      tabsEl.appendChild(btn);
+    });
+  }
+
+  // ------- навигация по месец -------
+  document.getElementById("prevBtn").onclick = () => {
+    viewDate.setMonth(viewDate.getMonth() - 1);
+    renderGrid();
+  };
+  document.getElementById("nextBtn").onclick = () => {
+    viewDate.setMonth(viewDate.getMonth() + 1);
+    renderGrid();
+  };
+
+  // ------- грид -------
+  const gridEl = document.getElementById("grid");
+  const monthLabelEl = document.getElementById("monthLabel");
+
+  function renderGrid() {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    monthLabelEl.textContent = `${MONTH_NAMES[month]} ${year}`;
+
+    gridEl.innerHTML = "";
+    DOW.forEach((d, i) => {
+      const el = document.createElement("div");
+      el.className = "dow" + (i >= 5 ? " weekend" : "");
+      el.textContent = d;
+      gridEl.appendChild(el);
+    });
+
+    const firstOfMonth = new Date(year, month, 1);
+    // Monday-start offset
+    let startOffset = (firstOfMonth.getDay() + 6) % 7;
+    const startDate = new Date(year, month, 1 - startOffset);
+
+    const today = new Date();
+    const todayKey = today.toDateString();
+
+    for (let i = 0; i < 42; i++) {
+      const cellDate = new Date(startDate);
+      cellDate.setDate(startDate.getDate() + i);
+      const inMonth = cellDate.getMonth() === month;
+      const cellUTC = Date.UTC(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
+
+      const cell = document.createElement("div");
+      cell.className = "cell" + (inMonth ? "" : " outside");
+      if (cellDate.toDateString() === todayKey) cell.classList.add("today");
+
+      const num = document.createElement("div");
+      num.className = "num";
+      num.textContent = cellDate.getDate();
+      cell.appendChild(num);
+
+      if (currentView === "all") {
+        const row = document.createElement("div");
+        row.className = "team-row";
+        TEAM_ORDER.forEach((team) => {
+          const t = shiftType(team, cellUTC);
+          const chip = document.createElement("span");
+          chip.className = "team-chip " + (t === "D" ? "day" : t === "N" ? "night" : "rest");
+          chip.textContent = team + (t === "R" ? "" : t === "D" ? "☀" : "☾");
+          row.appendChild(chip);
+        });
+        cell.appendChild(row);
+      } else {
+        const t = shiftType(currentView, cellUTC);
+        cell.classList.add(t === "D" ? "day-shift" : t === "N" ? "night-shift" : "rest-shift");
+        const badge = document.createElement("div");
+        badge.className = "badge";
+        badge.style.marginTop = "auto";
+        badge.textContent = TYPE_LABEL[t];
+        cell.appendChild(badge);
+      }
+
+      gridEl.appendChild(cell);
+    }
+  }
+
+  renderTabs();
+  renderGrid();
+</script>
+</body>
+</html>
