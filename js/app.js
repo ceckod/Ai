@@ -1,4 +1,4 @@
-// Helfy Plastics — app entry point
+// Helfi Plastics — app entry point
 // Тук ще се добавя реалната функционалност постепенно.
 
 if ("serviceWorker" in navigator) {
