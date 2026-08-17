@@ -125,6 +125,83 @@
   .dot.night { background: #000; border: 1px solid var(--line); }
   .dot.rest { background: var(--rest); border: 1px solid var(--line); }
 
+  /* бързо търсене на смяна */
+  .search-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+  }
+  .search-title {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .search-sub {
+    color: var(--text-dim);
+    font-size: 0.82rem;
+    margin: 0 0 14px;
+  }
+  .search-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .search-controls select {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+  }
+  .search-btn {
+    background: var(--accent);
+    color: #06201d;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 20px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+  .search-btn:hover { background: #6fe0d5; }
+  .search-result {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px;
+  }
+  .search-result .res-date {
+    grid-column: 1 / -1;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+  }
+  .result-chip {
+    border-radius: 10px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+  }
+  .result-chip .team-name {
+    display: block;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.86rem;
+    margin-bottom: 4px;
+  }
+  .result-chip.day { background: var(--accent); color: #06201d; border-color: var(--accent); }
+  .result-chip.night { background: var(--night); color: var(--night-text); border-color: #000; }
+  .result-chip.rest { background: var(--surface-2); color: var(--text-dim); }
+
   /* grid */
   .grid {
     display: grid;
@@ -156,6 +233,7 @@
     gap: 4px;
   }
   .cell.outside { opacity: 0.25; }
+  .cell.searched { box-shadow: 0 0 0 2px var(--accent) inset; }
   .cell .num {
     font-family: var(--font-mono);
     font-size: 0.78rem;
@@ -231,9 +309,22 @@
     <span><span class="dot rest"></span>Почивка</span>
   </div>
 
+  <div class="search-card">
+    <h3 class="search-title">Бързо търсене на смяна</h3>
+    <p class="search-sub">Избери дата (д/м/г) и виж коя смяна работи дневна, коя нощна и кои почиват.</p>
+    <div class="search-controls">
+      <select id="searchDay" aria-label="Ден"></select>
+      <select id="searchMonth" aria-label="Месец"></select>
+      <select id="searchYear" aria-label="Година"></select>
+      <button id="searchBtn" class="search-btn">Търси</button>
+    </div>
+    <div id="searchResult" class="search-result" hidden></div>
+  </div>
+
   <div class="grid" id="grid"></div>
 </div>
 
+<script src="js/clock.js"></script>
 <script>
   // ------- изчисляване на смените -------
   // База (8-дневен цикъл): Ден,Ден,Почивка,Почивка,Нощ,Нощ,Почивка,Почивка
@@ -254,8 +345,11 @@
   const MONTH_NAMES = ["Януари","Февруари","Март","Април","Май","Юни","Юли","Август","Септември","Октомври","Ноември","Декември"];
   const DOW = ["Пн","Вт","Ср","Чт","Пт","Сб","Нд"];
 
+  const DOW_FULL = ["Неделя","Понеделник","Вторник","Сряда","Четвъртък","Петък","Събота"];
+
   let currentView = "all"; // "all" | "А" | "Б" | "Ц" | "Д"
   let viewDate = new Date(); // local "today" for cursor
+  let searchedKey = null; // "г-м-д" на последно търсената дата, за подсветка в грида
 
   // ------- тагове -------
   const tabsEl = document.getElementById("tabs");
@@ -314,7 +408,9 @@
 
       const cell = document.createElement("div");
       cell.className = "cell" + (inMonth ? "" : " outside");
+      cell.dataset.date = `${cellDate.getFullYear()}-${cellDate.getMonth()}-${cellDate.getDate()}`;
       if (cellDate.toDateString() === todayKey) cell.classList.add("today");
+      if (searchedKey && cell.dataset.date === searchedKey) cell.classList.add("searched");
 
       const num = document.createElement("div");
       num.className = "num";
@@ -346,6 +442,89 @@
     }
   }
 
+  // ------- бързо търсене на смяна по дата -------
+  const dayEl = document.getElementById("searchDay");
+  const monthEl = document.getElementById("searchMonth");
+  const yearEl = document.getElementById("searchYear");
+  const resultEl = document.getElementById("searchResult");
+
+  function daysInMonth(y, m) {
+    return new Date(y, m + 1, 0).getDate();
+  }
+
+  function populateDays() {
+    const y = Number(yearEl.value);
+    const m = Number(monthEl.value);
+    const count = daysInMonth(y, m);
+    const prevVal = Number(dayEl.value) || 1;
+    dayEl.innerHTML = "";
+    for (let d = 1; d <= count; d++) {
+      const opt = document.createElement("option");
+      opt.value = d;
+      opt.textContent = d;
+      dayEl.appendChild(opt);
+    }
+    dayEl.value = Math.min(prevVal, count);
+  }
+
+  function populateSearchSelects() {
+    MONTH_NAMES.forEach((name, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = name;
+      monthEl.appendChild(opt);
+    });
+
+    const nowY = new Date().getFullYear();
+    for (let y = nowY - 1; y <= nowY + 3; y++) {
+      const opt = document.createElement("option");
+      opt.value = y;
+      opt.textContent = y;
+      yearEl.appendChild(opt);
+    }
+
+    const today = new Date();
+    monthEl.value = today.getMonth();
+    yearEl.value = today.getFullYear();
+    populateDays();
+    dayEl.value = today.getDate();
+  }
+
+  monthEl.addEventListener("change", populateDays);
+  yearEl.addEventListener("change", populateDays);
+
+  document.getElementById("searchBtn").addEventListener("click", () => {
+    const d = Number(dayEl.value);
+    const m = Number(monthEl.value);
+    const y = Number(yearEl.value);
+    const dateUTC = Date.UTC(y, m, d);
+    const localDow = new Date(y, m, d).getDay();
+
+    resultEl.hidden = false;
+    resultEl.innerHTML = "";
+
+    const dateHeader = document.createElement("div");
+    dateHeader.className = "res-date";
+    dateHeader.textContent = `${d}/${m + 1}/${y} — ${DOW_FULL[localDow]}, ${d} ${MONTH_NAMES[m]} ${y}г.`;
+    resultEl.appendChild(dateHeader);
+
+    TEAM_ORDER.forEach((team) => {
+      const t = shiftType(team, dateUTC);
+      const chip = document.createElement("div");
+      chip.className = "result-chip " + (t === "D" ? "day" : t === "N" ? "night" : "rest");
+      const label = t === "R" ? "Почивка" : TYPE_LABEL[t] + " смяна";
+      chip.innerHTML = `<span class="team-name">Смяна ${team}</span>${label}`;
+      resultEl.appendChild(chip);
+    });
+
+    // прескочи календара до търсения месец и подсвети деня
+    searchedKey = `${y}-${m}-${d}`;
+    viewDate = new Date(y, m, 1);
+    renderGrid();
+    resultEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+
+  populateSearchSelects();
   renderTabs();
   renderGrid();
 </script>
