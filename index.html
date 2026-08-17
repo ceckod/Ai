@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Helfy Plastics — Производствен контрол</title>
+  <meta name="description" content="Вътрешно приложение за производствен контрол на Helfy Plastics" />
+  <meta name="theme-color" content="#0b1220" />
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 2h6v3.5l1.5 2V21a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1V7.5L9 5.5V2z" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+      Helfy Plastics
+    </div>
+    <div class="status-pill">
+      <span class="status-dot"></span>
+      В разработка
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Производствен контрол</p>
+        <h1>От суровина до готова бутилка — на едно място.</h1>
+        <p>
+          Основата на приложението за Helfy Plastics. Ще расте постепенно —
+          модул по модул — докато покрие целия процес на производство.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#modules">Виж модулите</a>
+          <a class="btn btn-ghost" href="https://github.com/" target="_blank" rel="noopener">Отвори в GitHub</a>
+        </div>
+      </div>
+
+      <div class="bottle-viz" aria-hidden="true">
+        <svg viewBox="0 0 120 220" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="bottleClip">
+              <path d="M45 10h30v22l8 14v150a6 6 0 0 1-6 6H43a6 6 0 0 1-6-6V46l8-14V10z"/>
+            </clipPath>
+          </defs>
+          <path d="M45 10h30v22l8 14v150a6 6 0 0 1-6 6H43a6 6 0 0 1-6-6V46l8-14V10z"
+                fill="none" stroke="#263252" stroke-width="2"/>
+          <rect x="45" y="2" width="30" height="10" rx="2" fill="#FFB347"/>
+          <g clip-path="url(#bottleClip)">
+            <rect class="fill-rect" x="30" y="70" width="60" height="150" fill="#4FD1C5" fill-opacity="0.55"/>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <section class="modules" id="modules">
+      <h2 class="modules-heading">Модули</h2>
+      <p class="modules-sub">Placeholder структура — ще се дефинира постепенно с реална функционалност.</p>
+
+      <div class="module-grid">
+        <div class="module-card">
+          <span class="module-tag">Скоро</span>
+          <h3>Производство</h3>
+          <p>Проследяване на партиди и произведени бутилки по линия и смяна.</p>
+        </div>
+        <div class="module-card">
+          <span class="module-tag">Скоро</span>
+          <h3>Брак и качество</h3>
+          <p>Отчитане на брак, причини и контрол на качеството по процеса.</p>
+        </div>
+        <div class="module-card">
+          <span class="module-tag">Скоро</span>
+          <h3>Смени</h3>
+          <p>График на смени и екипи, обвързан с показателите на всяка от тях.</p>
+        </div>
+        <div class="module-card">
+          <span class="module-tag">Скоро</span>
+          <h3>Суровини</h3>
+          <p>Наличности и разход на суровина спрямо произведеното количество.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    Helfy Plastics · вътрешно приложение · инсталируемо като PWA / Android
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
