@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Helfi Plastics — Продукти</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --bg: #0b1220;
+    --surface: #131c2e;
+    --surface-2: #1b2740;
+    --line: #263252;
+    --accent: #4fd1c5;
+    --amber: #ffb347;
+    --night: #0a0e18;
+    --night-text: #cdd6e8;
+    --rest: #1b2740;
+    --text: #e7ecef;
+    --text-dim: #8e9bb3;
+    --font-display: "Space Grotesk", sans-serif;
+    --font-body: "Inter", sans-serif;
+    --font-mono: "IBM Plex Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    padding: 20px 16px 60px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  header.page {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  .sub {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin: 4px 0 0;
+  }
+  .navlinks { display: flex; gap: 8px; flex-wrap: wrap; }
+  .navlink {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    text-decoration: none;
+    border: 1px solid var(--line);
+    padding: 8px 14px;
+    border-radius: 10px;
+  }
+  .navlink:hover { border-color: var(--accent); color: var(--accent); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+  }
+  .card h3 {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-sub {
+    color: var(--text-dim);
+    font-size: 0.82rem;
+    margin: 0 0 14px;
+  }
+  .hint { color: var(--text-dim); font-size: 0.78rem; margin: 4px 0; }
+
+  .text-input, input[type="text"], input[type="number"], input[type="date"] {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    width: 100%;
+  }
+  .btn {
+    background: var(--accent);
+    color: #06201d;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 20px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+  .btn:hover { background: #6fe0d5; }
+  .ghost-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+  .ghost-btn:hover { border-color: #e05d5d; color: #e05d5d; }
+
+  #articleSummary {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+  .article-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .article-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    font-size: 0.84rem;
+  }
+  .article-row:last-child { border-bottom: none; }
+  .article-row:hover { background: var(--surface-2); }
+  .article-row.selected { background: rgba(79, 209, 197, 0.08); }
+  .ar-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--line); flex-shrink: 0;
+  }
+  .ar-dot.done { background: var(--accent); }
+  .ar-code {
+    font-family: var(--font-mono);
+    color: var(--accent);
+    flex-shrink: 0;
+    min-width: 78px;
+  }
+  .ar-name { color: var(--text); }
+
+  .detail-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .detail-code {
+    font-family: var(--font-mono);
+    color: var(--accent);
+    font-size: 0.85rem;
+  }
+  .detail-head h2 {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    margin: 2px 0 0;
+  }
+
+  .spec-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .spec-grid label {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .spec-derived {
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: var(--accent);
+  }
+
+  .log-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+    align-items: end;
+  }
+  .log-form .btn { grid-column: span 1; }
+
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+  .badge.confirmed { background: rgba(79, 209, 197, 0.15); color: var(--accent); }
+  .badge.calibrating { background: rgba(255, 179, 71, 0.15); color: var(--amber); }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.85rem;
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row span { color: var(--text-dim); }
+  .stat-row.highlight b { color: var(--accent); font-size: 0.95rem; }
+
+  .history-list { max-height: 260px; overflow-y: auto; }
+  .history-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.82rem;
+  }
+  .history-row:last-child { border-bottom: none; }
+  .del-log-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+  .del-log-btn:hover { color: #e05d5d; }
+
+  .search-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <div>
+      <h1>Продукти</h1>
+      <p class="sub">Опаковка (тава / стек / пале) и самонадграждащ се производствен цикъл</p>
+    </div>
+    <div class="navlinks">
+      <span class="navlink" id="syncStatus" style="cursor:default">💾 локално</span>
+      <a href="smeni.html" class="navlink">Смени</a>
+      <a href="index.html" class="navlink">← Начало</a>
+    </div>
+  </header>
+
+  <div class="card">
+    <h3>Избери артикул</h3>
+    <p class="card-sub" id="articleSummary"></p>
+    <input type="text" id="articleSearch" class="text-input" placeholder="Търси по код или име (напр. H500 или кетчуп)…" style="margin-bottom:10px" />
+    <div id="articleList" class="article-list"></div>
+  </div>
+
+  <div id="detailPanel" class="card" hidden>
+    <div class="detail-head">
+      <div>
+        <span class="detail-code" id="dCode"></span>
+        <h2 id="dName"></h2>
+      </div>
+      <button id="deleteArticleBtn" class="ghost-btn">Изтрий артикул</button>
+    </div>
+
+    <div class="card" style="background:var(--surface-2);margin-bottom:14px">
+      <h3>Опаковка</h3>
+      <div class="spec-grid">
+        <label>Бутилки в тава
+          <input type="number" id="specBottles" min="0" placeholder="напр. 24" />
+        </label>
+        <label>Тави в стек / чувал
+          <input type="number" id="specTrays" min="0" placeholder="напр. 10" />
+        </label>
+        <label>Стекове/чували на пале
+          <input type="number" id="specStacks" min="0" placeholder="напр. 6" />
+        </label>
+      </div>
+      <p class="spec-derived" id="specDerived"></p>
+    </div>
+
+    <div class="card" style="background:var(--surface-2);margin-bottom:14px">
+      <h3>Нов запис от производство</h3>
+      <p class="card-sub">Въведи машина, дата, отработени часове и произведени тави — цикълът се преизчислява автоматично.</p>
+      <div class="log-form">
+        <input type="text" id="logMachine" placeholder="Машина (напр. 3)" />
+        <input type="date" id="logDate" />
+        <input type="number" id="logDuration" step="0.1" min="0" placeholder="Часове" />
+        <input type="number" id="logTrays" min="0" placeholder="Тави" />
+        <button id="addLogBtn" class="btn">Добави запис</button>
+      </div>
+    </div>
+
+    <div class="card" style="background:var(--surface-2);margin-bottom:14px" id="statsCard">
+      <h3>Изчислен цикъл <span id="statsBadge"></span></h3>
+      <div id="statsBody"></div>
+    </div>
+
+    <div class="card" style="background:var(--surface-2)">
+      <h3>История на записите</h3>
+      <div id="historyList" class="history-list"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Добави нов артикул</h3>
+    <div class="search-controls">
+      <input type="text" id="newCode" class="text-input" placeholder="Код (напр. H500-99)" style="max-width:160px" />
+      <input type="text" id="newName" class="text-input" placeholder="Име на артикула" style="flex:1;min-width:180px" />
+      <button id="addArticleBtn" class="btn">Добави</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Резервно копие</h3>
+    <p class="card-sub">Данните се пазят локално в този браузър. Изтегли ги, ако искаш да ги пренесеш на друго устройство или да не ги загубиш.</p>
+    <div class="search-controls">
+      <button id="exportBtn" class="btn">Изтегли JSON</button>
+      <label class="ghost-btn" style="cursor:pointer">
+        Качи JSON
+        <input type="file" id="importFile" accept="application/json" hidden />
+      </label>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/clock.js"></script>
+<script src="js/products.js"></script>
+</body>
+</html>
