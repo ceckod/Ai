@@ -1,7 +1,7 @@
 {
-  "name": "Helfy Plastics — Производствен контрол",
-  "short_name": "Helfy",
-  "description": "Вътрешно приложение за производствен контрол на Helfy Plastics",
+  "name": "Helfi Plastics — Производствен контрол",
+  "short_name": "Helfi",
+  "description": "Вътрешно приложение за производствен контрол на Helfi Plastics",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -1,10 +1,11 @@
-// Helfy Plastics — service worker
+// Helfi Plastics — service worker
 // Проста offline-кеш логика. Ще расте с приложението.
 
-const CACHE_NAME = "helfy-cache-v1";
+const CACHE_NAME = "helfi-cache-v1";
 const CORE_ASSETS = [
   "/",
   "/index.html",
+  "/smeni.html",
   "/css/style.css",
   "/js/app.js",
   "/manifest.json",

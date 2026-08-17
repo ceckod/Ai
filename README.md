@@ -1,6 +1,6 @@
-# Helfy Plastics — приложение
+# Helfi Plastics — приложение
 
-Скелет за уеб приложението на Helfy Plastics. Инсталируем е като PWA и има
+Скелет за уеб приложението на Helfi Plastics. Инсталируем е като PWA и има
 готова верига за генериране на Android APK от самия сайт (TWA — Trusted Web
 Activity), без потребителят да отваря браузър.
 
@@ -24,10 +24,10 @@ twa-manifest.json         конфигурация за Bubblewrap (Android buil
 
 ## 1. Първоначален setup
 
-1. Създай ново GitHub repo (напр. `helfy-app`) и качи тези файлове.
+1. Създай ново GitHub repo (напр. `helfi-app`) и качи тези файлове.
 2. В repo → **Settings → Pages** → Source: избери **GitHub Actions**.
 3. При push към `main` сайтът автоматично се качва на:
-   `https://YOUR-USERNAME.github.io/helfy-app/`
+   `https://YOUR-USERNAME.github.io/helfi-app/`
 
 ## 2. Постепенно ъпгрейдване
 
@@ -45,7 +45,7 @@ Android ще го третира като различно приложение 
 
 ```bash
 npm install -g @bubblewrap/cli
-keytool -genkey -v -keystore android.keystore -alias helfy-key \
+keytool -genkey -v -keystore android.keystore -alias helfi-key \
   -keyalg RSA -keysize 2048 -validity 10000
 ```
 
@@ -58,7 +58,7 @@ keytool -genkey -v -keystore android.keystore -alias helfy-key \
    GitHub потребителско име (2 места).
 2. Вземи SHA256 подписа на ключа:
    ```bash
-   keytool -list -v -keystore android.keystore -alias helfy-key
+   keytool -list -v -keystore android.keystore -alias helfi-key
    ```
    Копирай стойността до `SHA256:` и я сложи в
    `.well-known/assetlinks.json` (замества `FILL_IN_AFTER_CREATING...`).
@@ -81,4 +81,4 @@ workflow-а → новият APK automатично отваря обновени
 ## Бележка
 
 Икониите (`icons/icon-*.png`) са временен placeholder (бутилка) — смени ги
-с истинско лого на Helfy Plastics, когато е готово.
+с истинско лого на Helfi Plastics, когато е готово.
