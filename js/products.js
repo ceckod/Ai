@@ -1,34 +1,32 @@
 // Helfi Plastics — Продукти / артикули
-// Спецификации на опаковката (тава / стек-чувал / пале) +
+// Спецификации на опаковката (тава ИЛИ стек-чувал -> пале) +
 // самонадграждащ се калкулатор на производствения цикъл.
 //
+// Всеки артикул има ФИКСИРАН пакетаж: или е на тава, или е на стек/чувал
+// (не и двете). "Матрица" = бр. бутилки в тавата/чувала. Палето е или
+// фиксиран брой тави/чували (напр. течен сапун = 13, премиум 415 = 10),
+// или лимит по височина (мм) — тогава броят се смята автоматично.
+//
 // Как работи "самонадграждането":
-// При всеки нов запис (машина, дата, часове работа, произведени тави)
-// скриптът НЕ пази стар фиксиран резултат — той преизчислява цикъла
-// наново от всички записи всеки път. Взима последните MIN_CONFIRM
+// При всеки нов запис (машина, дата, часове работа, произведени тави/
+// чували) скриптът НЕ пази стар фиксиран резултат — той преизчислява
+// цикъла наново от всички записи всеки път. Взима последните MIN_CONFIRM
 // записа и ако произведеният им темп (бут./час) съвпада в рамките на
 // TOLERANCE (%), приема стойността за "потвърдена". Иначе показва
 // текуща най-добра оценка (медиана) и продължава да събира данни.
-//
-// Достъп:
-// - Всеки, който отвори страницата, вижда data/products-state.json
-//   (публикуваните данни) READ-ONLY — не може да пипа нищо.
-// - Само влезлият с валиден GitHub token с права за запис в repo-то
-//   вижда формите за редакция. Всяка промяна прави commit директно
-//   към data/products-state.json през GitHub-ото REST API — без
-//   ръчно копиране на файлове.
+// Ако е зададен РЪЧЕН цикъл (сек/бутилка), той се ползва навсякъде
+// вместо изчисления — умният код продължава да калибрира на заден фон
+// за сравнение.
 
 (function () {
-  const GH_API = "https://api.github.com";
-  const DATA_PATH = "data/products-state.json";
-  const CRED_KEY = "helfi_gh_creds_v1"; // { token, owner, repo, branch }
-
+  const STORAGE_KEY = "helfi_products_v1";
   const TOLERANCE = 0.05; // 5% допустимо разминаване между последните записи
   const MIN_CONFIRM = 3;  // колко последователни записа трябва да съвпаднат
 
   // ---- начален каталог (от helfi.net/products/) ----
+  // По желание: [код, име, пакетаж('tray'|'stack'), тави/чували на пале]
   const SEED_ARTICLES = [
-    ["H415-68", "415мл премиум"],
+    ["H415-68", "415мл премиум", "tray", 10],
     ["H100-74", "100мл спирт"],
     ["H500-81", "500мл Веджи уош"],
     ["H750-67", "750мл премиум"],
@@ -36,7 +34,7 @@
     ["H150-70", "150мл флакон"],
     ["H200-71", "200мл флакон"],
     ["H300-72", "300мл флакон"],
-    ["H400-69", "400мл течен сапун"],
+    ["H400-69", "400мл течен сапун", "tray", 13],
     ["H050-73", "50мл спирт"],
     ["H500-76", "500мл 38мм"],
     ["H750-80", "750мл пръскалка"],
@@ -95,205 +93,143 @@
     ["H300-15", "300мл течен сапун"],
   ];
 
-  function seedArticlesObj() {
-    const obj = {};
-    SEED_ARTICLES.forEach(([code, name]) => {
-      obj[code] = { code, name, bottlesPerTray: null, traysPerStack: null, stacksPerPallet: null, logs: [] };
-    });
-    return obj;
-  }
-
-  function withSeedFallback(articles) {
-    const seed = seedArticlesObj();
-    Object.keys(seed).forEach((code) => {
-      if (!articles[code]) articles[code] = seed[code];
-    });
-    return articles;
-  }
-
-  function utf8ToBase64(str) {
-    return btoa(unescape(encodeURIComponent(str)));
-  }
-
-  // ---------------- GitHub вход/креденшъли ----------------
-  function ghCreds() {
-    try {
-      return JSON.parse(localStorage.getItem(CRED_KEY)) || null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function isLoggedIn() {
-    const c = ghCreds();
-    return !!(c && c.token && c.owner && c.repo);
-  }
-
-  function ghHeaders() {
-    const c = ghCreds();
+  // ---------------- state ----------------
+  function blankArticle(code, name, packagingUnit, unitsPerPallet) {
     return {
-      Authorization: `Bearer ${c.token}`,
-      Accept: "application/vnd.github+json",
+      code,
+      name,
+      packagingUnit: packagingUnit || "tray", // 'tray' | 'stack'
+      bottlesPerUnit: null,                    // матрица: бр. бутилки в тавата/чувала
+      palletMode: unitsPerPallet ? "count" : "count", // 'count' | 'height'
+      unitsPerPallet: unitsPerPallet || null,  // фиксиран бр. тави/чували на пале
+      unitHeightMm: null,                      // височина на 1 тава/чувал (мм)
+      palletMaxHeightMm: null,                 // макс. височина на пале (мм)
+      useManualCycle: false,
+      manualCycleSec: null,                    // ръчно зададени сек/бутилка
+      logs: [],                                // {id, machine, date, durationHours, units, ts}
     };
   }
 
-  async function validateLogin(token, owner, repo) {
-    const res = await fetch(`${GH_API}/repos/${owner}/${repo}`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
-    });
-    if (res.status === 404) throw new Error("Repo-то не е намерено (провери owner/repo) или токенът няма достъп.");
-    if (!res.ok) throw new Error(`GitHub грешка (${res.status})`);
-    const data = await res.json();
-    if (!data.permissions || !data.permissions.push) {
-      throw new Error("Токенът няма право за запис (push) в това repo.");
+  function emptyState() {
+    return { articles: {} };
+  }
+
+  function migrateArticle(old) {
+    // мигрира стар 3-нивов модел (тава -> стек -> пале) към новия 2-нивов
+    const a = blankArticle(old.code, old.name);
+    if (old.packagingUnit) {
+      // вече е в новия формат
+      return Object.assign(a, old);
     }
-    return data.default_branch || "main";
+    a.bottlesPerUnit = old.bottlesPerTray ?? null;
+    a.packagingUnit = "tray";
+    if (old.traysPerStack && old.stacksPerPallet) {
+      a.palletMode = "count";
+      a.unitsPerPallet = old.traysPerStack * old.stacksPerPallet;
+    }
+    a.logs = (old.logs || []).map((e) => ({
+      id: e.id,
+      machine: e.machine,
+      date: e.date,
+      durationHours: e.durationHours,
+      units: e.units ?? e.trays,
+      ts: e.ts,
+    }));
+    return a;
   }
 
-  async function ghGetSha() {
-    const c = ghCreds();
-    const url = `${GH_API}/repos/${c.owner}/${c.repo}/contents/${DATA_PATH}?ref=${encodeURIComponent(c.branch)}`;
-    const res = await fetch(url, { headers: ghHeaders() });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`GitHub грешка при четене (${res.status})`);
-    const data = await res.json();
-    return data.sha;
-  }
-
-  async function commitToGitHub(message) {
-    if (!isLoggedIn()) return;
-    setCommitStatus("saving");
+  function loadState() {
+    let state;
     try {
-      const c = ghCreds();
-      let sha = await ghGetSha();
-      const body = {
-        message: message || "Обновяване на продукти",
-        content: utf8ToBase64(JSON.stringify(state, null, 2)),
-        branch: c.branch,
-      };
-      if (sha) body.sha = sha;
-
-      let res = await fetch(`${GH_API}/repos/${c.owner}/${c.repo}/contents/${DATA_PATH}`, {
-        method: "PUT",
-        headers: { ...ghHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (res.status === 409) {
-        // конфликт (файлът е сменен междувременно) — опресняваме sha и опитваме пак
-        sha = await ghGetSha();
-        body.sha = sha;
-        res = await fetch(`${GH_API}/repos/${c.owner}/${c.repo}/contents/${DATA_PATH}`, {
-          method: "PUT",
-          headers: { ...ghHeaders(), "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-      }
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.message || `HTTP ${res.status}`);
-      }
-      setCommitStatus("saved");
+      state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || emptyState();
     } catch (e) {
-      setCommitStatus("error", e.message);
+      state = emptyState();
     }
+    if (!state.articles) state.articles = {};
+    // мигрираме съществуващи артикули от стария формат, ако е нужно
+    Object.keys(state.articles).forEach((code) => {
+      const a = state.articles[code];
+      if (!a.packagingUnit) {
+        state.articles[code] = migrateArticle(a);
+      }
+    });
+    // добавяме липсващи артикули от каталога, без да пипаме вече въведени
+    SEED_ARTICLES.forEach(([code, name, packagingUnit, unitsPerPallet]) => {
+      if (!state.articles[code]) {
+        state.articles[code] = blankArticle(code, name, packagingUnit, unitsPerPallet);
+      }
+    });
+    return state;
   }
 
-  // ---------------- state ----------------
-  let state = { articles: seedArticlesObj() };
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    pushToFirestore();
+  }
+
+  let fsDocRef = null;
+  let state = loadState();
+  saveState();
   let selectedCode = null;
 
-  async function loadPublished() {
-    try {
-      const res = await fetch("data/products-state.json", { cache: "no-store" });
-      if (!res.ok) throw new Error("no file");
-      const data = await res.json();
-      if (!data.articles) throw new Error("bad shape");
-      state = { articles: withSeedFallback(data.articles) };
-    } catch (e) {
-      state = { articles: seedArticlesObj() };
-    }
-    renderList();
-    if (selectedCode) renderDetail();
-  }
+  // ---------------- Firestore (по избор — синхронизация между устройства) ----------------
+  // Активира се сама, ако js/firebase-config.js съдържа истински ключове.
+  // Ако не е конфигурирано, всичко работи както преди — само в localStorage.
+  const syncStatusEl = document.getElementById("syncStatus");
 
-  function saveState(commitMsg) {
-    if (!isLoggedIn()) return;
-    commitToGitHub(commitMsg);
-  }
-
-  // ---------------- UI: вход / изход ----------------
-  const loginCard = document.getElementById("loginCard");
-  const loginForm = document.getElementById("loginForm");
-  const loginError = document.getElementById("loginError");
-  const loginBtn = document.getElementById("loginBtn");
-  const logoutBtn = document.getElementById("logoutBtn");
-  const commitStatusEl = document.getElementById("commitStatus");
-  const whoamiEl = document.getElementById("whoami");
-
-  function setCommitStatus(mode, detail) {
-    if (!commitStatusEl) return;
-    if (mode === "saving") {
-      commitStatusEl.textContent = "⏳ запазва се в GitHub…";
-      commitStatusEl.style.color = "var(--text-dim)";
-    } else if (mode === "saved") {
-      commitStatusEl.textContent = "✓ запазено в GitHub";
-      commitStatusEl.style.color = "var(--accent)";
+  function setSyncStatus(mode) {
+    if (!syncStatusEl) return;
+    if (mode === "synced") {
+      syncStatusEl.textContent = "☁ синхронизирано";
+      syncStatusEl.style.color = "var(--accent)";
+      syncStatusEl.style.borderColor = "var(--accent)";
+    } else if (mode === "connecting") {
+      syncStatusEl.textContent = "☁ свързване…";
+      syncStatusEl.style.color = "var(--text-dim)";
     } else if (mode === "error") {
-      commitStatusEl.textContent = "⚠ грешка при запис" + (detail ? `: ${detail}` : "");
-      commitStatusEl.style.color = "var(--amber)";
+      syncStatusEl.textContent = "⚠ облакът не отговаря — работи се локално";
+      syncStatusEl.style.color = "var(--amber)";
+      syncStatusEl.style.borderColor = "var(--amber)";
     } else {
-      commitStatusEl.textContent = "";
+      syncStatusEl.textContent = "💾 локално";
+      syncStatusEl.style.color = "var(--text-dim)";
+      syncStatusEl.style.borderColor = "var(--line)";
     }
   }
 
-  function applyLoginUI() {
-    const logged = isLoggedIn();
-    document.body.classList.toggle("edit-mode", logged);
-    if (loginCard) loginCard.hidden = logged;
-    if (logoutBtn) logoutBtn.hidden = !logged;
-    if (whoamiEl) {
-      const c = ghCreds();
-      whoamiEl.textContent = logged ? `${c.owner}/${c.repo}` : "";
+  function initFirestore() {
+    const cfg = window.HELFI_FIREBASE_CONFIG;
+    if (!cfg || !cfg.apiKey || typeof firebase === "undefined") return;
+    try {
+      setSyncStatus("connecting");
+      firebase.initializeApp(cfg);
+      const db = firebase.firestore();
+      fsDocRef = db.collection("helfi_state").doc("products");
+      fsDocRef.onSnapshot(
+        (snap) => {
+          setSyncStatus("synced");
+          if (!snap.exists) {
+            pushToFirestore(); // пръв път — качваме локалните данни в облака
+            return;
+          }
+          const remote = snap.data();
+          if (remote && remote.json) {
+            state = JSON.parse(remote.json);
+            localStorage.setItem(STORAGE_KEY, remote.json);
+            renderList();
+            if (selectedCode && state.articles[selectedCode]) renderDetail();
+          }
+        },
+        () => setSyncStatus("error")
+      );
+    } catch (e) {
+      setSyncStatus("error");
     }
-    [specBottles, specTrays, specStacks].forEach((el) => el && (el.disabled = !logged));
-    setCommitStatus(null);
   }
 
-  if (loginForm) {
-    loginForm.addEventListener("submit", async (ev) => {
-      ev.preventDefault();
-      loginError.textContent = "";
-      loginBtn.disabled = true;
-      loginBtn.textContent = "Проверка…";
-      const token = document.getElementById("ghToken").value.trim();
-      const owner = document.getElementById("ghOwner").value.trim();
-      const repo = document.getElementById("ghRepo").value.trim();
-      let branch = document.getElementById("ghBranch").value.trim();
-      try {
-        const defaultBranch = await validateLogin(token, owner, repo);
-        if (!branch) branch = defaultBranch;
-        localStorage.setItem(CRED_KEY, JSON.stringify({ token, owner, repo, branch }));
-        applyLoginUI();
-        renderList();
-        if (selectedCode) renderDetail();
-      } catch (e) {
-        loginError.textContent = e.message;
-      } finally {
-        loginBtn.disabled = false;
-        loginBtn.textContent = "Вход";
-      }
-    });
-  }
-
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", () => {
-      localStorage.removeItem(CRED_KEY);
-      applyLoginUI();
-      renderList();
-      if (selectedCode) renderDetail();
-    });
+  function pushToFirestore() {
+    if (!fsDocRef) return;
+    fsDocRef.set({ json: JSON.stringify(state), updatedAt: Date.now() }).catch(() => setSyncStatus("error"));
   }
 
   // ---------------- helpers ----------------
@@ -311,27 +247,43 @@
     return `${h} ч ${m} мин`;
   }
 
+  function unitLabel(a, plural) {
+    const isTray = a.packagingUnit !== "stack";
+    if (isTray) return plural ? "тави" : "тава";
+    return plural ? "стекове/чували" : "стек/чувал";
+  }
+
+  function unitsPerPalletOf(a) {
+    if (a.palletMode === "height") {
+      if (a.unitHeightMm > 0 && a.palletMaxHeightMm > 0) {
+        return Math.floor(a.palletMaxHeightMm / a.unitHeightMm);
+      }
+      return null;
+    }
+    return a.unitsPerPallet || null;
+  }
+
   function specComplete(a) {
-    return !!(a.bottlesPerTray && a.traysPerStack && a.stacksPerPallet);
+    return !!(a.bottlesPerUnit && unitsPerPalletOf(a));
   }
 
   function computeEntryRate(entry, article) {
-    if (!entry.durationHours || !entry.trays) return null;
-    if (article.bottlesPerTray) {
+    if (!entry.durationHours || !entry.units) return null;
+    if (article.bottlesPerUnit) {
       return {
-        value: (entry.trays * article.bottlesPerTray) / entry.durationHours,
+        value: (entry.units * article.bottlesPerUnit) / entry.durationHours,
         unit: "бутилки/час",
       };
     }
-    return { value: entry.trays / entry.durationHours, unit: "тави/час" };
+    return { value: entry.units / entry.durationHours, unit: `${unitLabel(article, true)}/час` };
   }
 
   function computeStats(article) {
-    const usable = article.logs.filter((e) => e.durationHours > 0 && e.trays > 0);
+    const usable = article.logs.filter((e) => e.durationHours > 0 && e.units > 0);
     if (usable.length === 0) return { count: 0 };
 
     const rates = usable.map((e) => computeEntryRate(e, article).value);
-    const unit = article.bottlesPerTray ? "бутилки/час" : "тави/час";
+    const unit = article.bottlesPerUnit ? "бутилки/час" : `${unitLabel(article, true)}/час`;
 
     let confirmed = false;
     let value;
@@ -357,6 +309,17 @@
     return { count: rates.length, confirmed, value, unit, spread };
   }
 
+  // effective rate = ръчният цикъл (ако е включен) ИЛИ умно изчисленият
+  function effectiveRate(article, stats) {
+    if (article.useManualCycle && article.manualCycleSec > 0 && article.bottlesPerUnit) {
+      return { value: 3600 / article.manualCycleSec, unit: "бутилки/час", source: "manual" };
+    }
+    if (stats.count > 0) {
+      return { value: stats.value, unit: stats.unit, source: "smart" };
+    }
+    return null;
+  }
+
   // ---------------- rendering: article list ----------------
   const listEl = document.getElementById("articleList");
   const searchEl = document.getElementById("articleSearch");
@@ -365,7 +328,7 @@
   function renderSummary() {
     const codes = Object.keys(state.articles);
     const done = codes.filter((c) => specComplete(state.articles[c])).length;
-    summaryEl.textContent = `${done} от ${codes.length} артикула имат въведена опаковка (тава/стек/пале)`;
+    summaryEl.textContent = `${done} от ${codes.length} артикула имат въведена опаковка (тава/стек → пале)`;
   }
 
   function renderList() {
@@ -394,17 +357,44 @@
   const panel = document.getElementById("detailPanel");
   const dCode = document.getElementById("dCode");
   const dName = document.getElementById("dName");
+
+  const specUnit = document.getElementById("specUnit");
   const specBottles = document.getElementById("specBottles");
-  const specTrays = document.getElementById("specTrays");
-  const specStacks = document.getElementById("specStacks");
+  const specPalletMode = document.getElementById("specPalletMode");
+  const specUnitsPerPallet = document.getElementById("specUnitsPerPallet");
+  const specUnitHeight = document.getElementById("specUnitHeight");
+  const specPalletMaxHeight = document.getElementById("specPalletMaxHeight");
+  const fieldUnitsPerPallet = document.getElementById("fieldUnitsPerPallet");
+  const fieldUnitHeight = document.getElementById("fieldUnitHeight");
+  const fieldPalletMaxHeight = document.getElementById("fieldPalletMaxHeight");
   const specDerived = document.getElementById("specDerived");
+
+  const specUseManualCycle = document.getElementById("specUseManualCycle");
+  const specManualCycle = document.getElementById("specManualCycle");
+
   const statsBadge = document.getElementById("statsBadge");
   const statsBody = document.getElementById("statsBody");
   const historyList = document.getElementById("historyList");
   const logMachine = document.getElementById("logMachine");
   const logDate = document.getElementById("logDate");
   const logDuration = document.getElementById("logDuration");
-  const logTrays = document.getElementById("logTrays");
+  const logUnits = document.getElementById("logUnits");
+
+  function updateUnitLabels(a) {
+    const sing = unitLabel(a, false);
+    const plur = unitLabel(a, true);
+    document.querySelectorAll(".unit-lbl-1").forEach((el) => (el.textContent = sing));
+    document.querySelectorAll(".unit-lbl-1cap").forEach((el) => (el.textContent = sing.charAt(0).toUpperCase() + sing.slice(1)));
+    document.querySelectorAll(".unit-lbl-2").forEach((el) => (el.textContent = plur));
+    logUnits.placeholder = plur.charAt(0).toUpperCase() + plur.slice(1);
+  }
+
+  function togglePalletFields(a) {
+    const byHeight = a.palletMode === "height";
+    fieldUnitsPerPallet.hidden = byHeight;
+    fieldUnitHeight.hidden = !byHeight;
+    fieldPalletMaxHeight.hidden = !byHeight;
+  }
 
   function selectArticle(code) {
     selectedCode = code;
@@ -420,60 +410,75 @@
 
     dCode.textContent = a.code;
     dName.textContent = a.name;
-    specBottles.value = a.bottlesPerTray ?? "";
-    specTrays.value = a.traysPerStack ?? "";
-    specStacks.value = a.stacksPerPallet ?? "";
-    [specBottles, specTrays, specStacks].forEach((el) => (el.disabled = !isLoggedIn()));
 
+    updateUnitLabels(a);
+
+    specUnit.value = a.packagingUnit;
+    specBottles.value = a.bottlesPerUnit ?? "";
+    specPalletMode.value = a.palletMode;
+    specUnitsPerPallet.value = a.unitsPerPallet ?? "";
+    specUnitHeight.value = a.unitHeightMm ?? "";
+    specPalletMaxHeight.value = a.palletMaxHeightMm ?? "";
+    togglePalletFields(a);
+
+    specUseManualCycle.checked = !!a.useManualCycle;
+    specManualCycle.value = a.manualCycleSec ?? "";
+    specManualCycle.disabled = !a.useManualCycle;
+
+    const unitsPP = unitsPerPalletOf(a);
     if (specComplete(a)) {
-      const traysPerPallet = a.traysPerStack * a.stacksPerPallet;
-      const bottlesPerPallet = a.bottlesPerTray * traysPerPallet;
-      specDerived.textContent =
-        `= ${fmtNum(traysPerPallet, 0)} тави на пале · ${fmtNum(bottlesPerPallet, 0)} бутилки на пале`;
+      const bottlesPerPallet = a.bottlesPerUnit * unitsPP;
+      let txt = `= ${fmtNum(unitsPP, 0)} ${unitLabel(a, true)} на пале · ${fmtNum(bottlesPerPallet, 0)} бутилки на пале`;
+      if (a.palletMode === "height") {
+        txt += ` (при височина ${fmtNum(a.unitHeightMm, 0)} мм на ${unitLabel(a, false)} и лимит ${fmtNum(a.palletMaxHeightMm, 0)} мм)`;
+      }
+      specDerived.textContent = txt;
     } else {
-      specDerived.textContent = isLoggedIn()
-        ? "Въведи бутилки в тава, тави в стек и стекове на пале, за да видиш пълното пале."
-        : "Опаковката за този артикул все още не е въведена.";
+      specDerived.textContent = `Въведи матрицата (бутилки в ${unitLabel(a, false)}) и лимита на палето, за да видиш пълното пале.`;
     }
 
     // stats
     const stats = computeStats(a);
-    if (stats.count === 0) {
+    const eff = effectiveRate(a, stats);
+
+    if (!eff) {
       statsBadge.textContent = "";
       statsBody.innerHTML = `<p class="hint">Все още няма записи от производство за този артикул.</p>`;
     } else {
-      if (stats.confirmed) {
+      if (eff.source === "manual") {
+        statsBadge.innerHTML = `<span class="badge confirmed">ръчно зададен</span>`;
+      } else if (stats.confirmed) {
         statsBadge.innerHTML = `<span class="badge confirmed">потвърден · последните ${MIN_CONFIRM} съвпадат</span>`;
       } else {
+        const need = MIN_CONFIRM - Math.min(stats.count, MIN_CONFIRM);
         const spreadTxt = stats.spread !== null ? ` (разлика ${fmtNum(stats.spread * 100, 0)}%)` : "";
         statsBadge.innerHTML = `<span class="badge calibrating">калибриране · ${stats.count} запис${stats.count === 1 ? "" : "а"}${spreadTxt}</span>`;
       }
 
       const rows = [];
-      rows.push(`<div class="stat-row"><span>Темп на производство</span><b>${fmtNum(stats.value, 0)} ${stats.unit}</b></div>`);
+      rows.push(`<div class="stat-row"><span>Темп на производство</span><b>${fmtNum(eff.value, 0)} ${eff.unit}</b></div>`);
 
-      if (a.bottlesPerTray) {
-        const cycleSec = 3600 / stats.value;
+      if (a.bottlesPerUnit) {
+        const cycleSec = 3600 / eff.value;
         rows.push(`<div class="stat-row"><span>Цикъл на бутилка</span><b>${fmtNum(cycleSec, 2)} сек</b></div>`);
-        const timePerTrayH = a.bottlesPerTray / stats.value;
-        rows.push(`<div class="stat-row"><span>Време за 1 тава</span><b>${fmtHM(timePerTrayH)}</b></div>`);
-        if (a.traysPerStack) {
-          rows.push(`<div class="stat-row"><span>Време за 1 стек/чувал</span><b>${fmtHM(timePerTrayH * a.traysPerStack)}</b></div>`);
-        }
-        if (a.traysPerStack && a.stacksPerPallet) {
-          const timePerPalletH = (a.bottlesPerTray * a.traysPerStack * a.stacksPerPallet) / stats.value;
+        const timePerUnitH = a.bottlesPerUnit / eff.value;
+        rows.push(`<div class="stat-row"><span>Време за 1 ${unitLabel(a, false)}</span><b>${fmtHM(timePerUnitH)}</b></div>`);
+        if (unitsPP) {
+          const timePerPalletH = (a.bottlesPerUnit * unitsPP) / eff.value;
           rows.push(`<div class="stat-row highlight"><span>Време за 1 пале</span><b>${fmtHM(timePerPalletH)}</b></div>`);
         }
       } else {
-        rows.push(`<div class="stat-row"><span>Време за 1 тава</span><b>${fmtHM(1 / stats.value)}</b></div>`);
-        if (a.traysPerStack) {
-          rows.push(`<div class="stat-row"><span>Време за 1 стек/чувал</span><b>${fmtHM(a.traysPerStack / stats.value)}</b></div>`);
+        rows.push(`<div class="stat-row"><span>Време за 1 ${unitLabel(a, false)}</span><b>${fmtHM(1 / eff.value)}</b></div>`);
+        if (unitsPP) {
+          rows.push(`<div class="stat-row highlight"><span>Време за 1 пале</span><b>${fmtHM(unitsPP / eff.value)}</b></div>`);
         }
-        if (a.traysPerStack && a.stacksPerPallet) {
-          rows.push(`<div class="stat-row highlight"><span>Време за 1 пале</span><b>${fmtHM((a.traysPerStack * a.stacksPerPallet) / stats.value)}</b></div>`);
-        }
-        rows.push(`<p class="hint">Въведи "бутилки в тава", за да видиш и цикъла в секунди на бутилка.</p>`);
+        rows.push(`<p class="hint">Въведи матрицата (бутилки в ${unitLabel(a, false)}), за да видиш и цикъла в секунди на бутилка.</p>`);
       }
+
+      if (eff.source === "manual" && stats.count > 0) {
+        rows.push(`<p class="hint">Умният код изчислява (за сравнение): ${fmtNum(stats.value, 0)} ${stats.unit}${stats.confirmed ? " · потвърдено" : " · калибрира се"}.</p>`);
+      }
+
       statsBody.innerHTML = rows.join("");
     }
 
@@ -486,54 +491,62 @@
         .map((e) => {
           const r = computeEntryRate(e, a);
           const rateTxt = r ? `${fmtNum(r.value, 0)} ${r.unit}` : "—";
-          const delBtn = isLoggedIn()
-            ? `<button class="del-log-btn" data-id="${e.id}" title="Изтрий записа">✕</button>`
-            : "";
           return `
             <div class="history-row" data-id="${e.id}">
               <div>
                 <b>${e.date || "—"}</b> · машина ${e.machine || "—"}<br/>
-                <span class="hint">${fmtNum(e.durationHours, 1)} ч · ${fmtNum(e.trays, 0)} тави → ${rateTxt}</span>
+                <span class="hint">${fmtNum(e.durationHours, 1)} ч · ${fmtNum(e.units, 0)} ${unitLabel(a, true)} → ${rateTxt}</span>
               </div>
-              ${delBtn}
+              <button class="del-log-btn" data-id="${e.id}" title="Изтрий записа">✕</button>
             </div>`;
         })
         .join("");
       historyList.querySelectorAll(".del-log-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
-          if (!isLoggedIn()) return;
           a.logs = a.logs.filter((e) => e.id !== btn.dataset.id);
+          saveState();
           renderDetail();
           renderList();
-          saveState(`Изтрит запис за ${a.code}`);
         });
       });
     }
   }
 
   function saveSpec() {
-    if (!isLoggedIn()) return;
     const a = state.articles[selectedCode];
     if (!a) return;
-    a.bottlesPerTray = specBottles.value ? Number(specBottles.value) : null;
-    a.traysPerStack = specTrays.value ? Number(specTrays.value) : null;
-    a.stacksPerPallet = specStacks.value ? Number(specStacks.value) : null;
+    a.packagingUnit = specUnit.value === "stack" ? "stack" : "tray";
+    a.bottlesPerUnit = specBottles.value ? Number(specBottles.value) : null;
+    a.palletMode = specPalletMode.value === "height" ? "height" : "count";
+    a.unitsPerPallet = specUnitsPerPallet.value ? Number(specUnitsPerPallet.value) : null;
+    a.unitHeightMm = specUnitHeight.value ? Number(specUnitHeight.value) : null;
+    a.palletMaxHeightMm = specPalletMaxHeight.value ? Number(specPalletMaxHeight.value) : null;
+    a.useManualCycle = !!specUseManualCycle.checked;
+    a.manualCycleSec = specManualCycle.value ? Number(specManualCycle.value) : null;
+    saveState();
     renderDetail();
     renderList();
-    saveState(`Опаковка: ${a.code}`);
   }
 
-  [specBottles, specTrays, specStacks].forEach((el) => {
+  [specUnit, specBottles, specPalletMode, specUnitsPerPallet, specUnitHeight, specPalletMaxHeight, specUseManualCycle, specManualCycle].forEach((el) => {
     el.addEventListener("change", saveSpec);
   });
 
+  specPalletMode.addEventListener("change", () => {
+    const a = state.articles[selectedCode];
+    if (a) togglePalletFields({ palletMode: specPalletMode.value });
+  });
+
+  specUseManualCycle.addEventListener("change", () => {
+    specManualCycle.disabled = !specUseManualCycle.checked;
+  });
+
   document.getElementById("addLogBtn").addEventListener("click", () => {
-    if (!isLoggedIn()) return;
     const a = state.articles[selectedCode];
     if (!a) return;
     const duration = Number(logDuration.value);
-    const trays = Number(logTrays.value);
-    if (!duration || !trays) {
+    const units = Number(logUnits.value);
+    if (!duration || !units) {
       logDuration.focus();
       return;
     }
@@ -542,31 +555,29 @@
       machine: logMachine.value.trim(),
       date: logDate.value || new Date().toISOString().slice(0, 10),
       durationHours: duration,
-      trays,
+      units,
       ts: Date.now(),
     });
+    saveState();
     if (logMachine.value.trim()) localStorage.setItem("helfi_last_machine", logMachine.value.trim());
     logDuration.value = "";
-    logTrays.value = "";
+    logUnits.value = "";
     renderDetail();
     renderList();
-    saveState(`Нов запис: ${a.code}`);
   });
 
   document.getElementById("deleteArticleBtn").addEventListener("click", () => {
-    if (!isLoggedIn() || !selectedCode) return;
-    if (!confirm(`Да изтрия артикул ${selectedCode}? Ще стане веднага в GitHub.`)) return;
-    const code = selectedCode;
-    delete state.articles[code];
+    if (!selectedCode) return;
+    if (!confirm(`Да изтрия артикул ${selectedCode}? Всички записи ще се загубят.`)) return;
+    delete state.articles[selectedCode];
+    saveState();
     selectedCode = null;
     panel.hidden = true;
     renderList();
-    saveState(`Изтрит артикул: ${code}`);
   });
 
   // ---------------- add new article ----------------
   document.getElementById("addArticleBtn").addEventListener("click", () => {
-    if (!isLoggedIn()) return;
     const codeEl = document.getElementById("newCode");
     const nameEl = document.getElementById("newName");
     const code = codeEl.value.trim();
@@ -576,30 +587,51 @@
       alert("Артикул с такъв код вече съществува.");
       return;
     }
-    state.articles[code] = {
-      code,
-      name,
-      bottlesPerTray: null,
-      traysPerStack: null,
-      stacksPerPallet: null,
-      logs: [],
-    };
+    state.articles[code] = blankArticle(code, name);
+    saveState();
     codeEl.value = "";
     nameEl.value = "";
     renderList();
     selectArticle(code);
-    saveState(`Нов артикул: ${code}`);
   });
 
-  // ---------------- износ (резервно копие) ----------------
+  // ---------------- export / import ----------------
   document.getElementById("exportBtn").addEventListener("click", () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "products-state.json";
+    a.download = `helfi-produkti-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  });
+
+  document.getElementById("importFile").addEventListener("change", (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const imported = JSON.parse(reader.result);
+        if (!imported.articles) throw new Error("невалиден файл");
+        if (!confirm("Това ще замени текущите данни в браузъра с тези от файла. Продължи?")) return;
+        state = imported;
+        // мигрираме, ако файлът е от стар формат
+        Object.keys(state.articles).forEach((code) => {
+          if (!state.articles[code].packagingUnit) {
+            state.articles[code] = migrateArticle(state.articles[code]);
+          }
+        });
+        saveState();
+        selectedCode = null;
+        panel.hidden = true;
+        renderList();
+      } catch (e) {
+        alert("Файлът не е валиден JSON износ от тази страница.");
+      }
+    };
+    reader.readAsText(file);
+    ev.target.value = "";
   });
 
   // ---------------- init ----------------
@@ -607,7 +639,6 @@
   const lastMachine = localStorage.getItem("helfi_last_machine");
   if (lastMachine) logMachine.value = lastMachine;
 
-  applyLoginUI();
   renderList();
-  loadPublished();
+  initFirestore();
 })();
