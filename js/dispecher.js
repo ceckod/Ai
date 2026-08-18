@@ -55,15 +55,6 @@
     return `Ръчно зададена смяна · ${d} · ${fmtNum(shiftHours(), 1)} ч`;
   }
 
-  function articleOptionsHtml(selected) {
-    let html = `<option value="">— без продукт —</option>`;
-    articleCodes.forEach((code) => {
-      const a = articles[code];
-      html += `<option value="${code}" ${code === selected ? "selected" : ""}>${a.code} — ${a.name}</option>`;
-    });
-    return html;
-  }
-
   function loadForShift() {
     currentShiftKey = shiftKey();
     const saved = core.getDispatchForShift(currentShiftKey);
@@ -84,16 +75,23 @@
   function renderMachines() {
     machineCountEl.textContent = `${machines.length} машина${machines.length === 1 ? "" : "и"}`;
     machineListEl.innerHTML = machines
-      .map(
-        (m, idx) => `
+      .map((m, idx) => {
+        const combo = core.articleComboHtml({
+          id: `d-${m.id}`,
+          articles,
+          value: m.articleCode,
+          placeholder: "Пиши код или име (напр. 415 или премиум)…",
+        });
+        m._labelToCode = combo.labelToCode;
+        return `
       <div class="machine-row" data-id="${m.id}">
         <div class="machine-row-head">
           <input type="text" data-field="name" data-id="${m.id}" value="${m.name || ""}" placeholder="Машина ${idx + 1}" />
           ${machines.length > 1 ? `<button class="machine-remove" data-remove="${m.id}" title="Премахни">✕</button>` : ""}
         </div>
-        <select data-field="article" data-id="${m.id}">${articleOptionsHtml(m.articleCode)}</select>
-      </div>`
-      )
+        ${combo.html}
+      </div>`;
+      })
       .join("");
 
     machineListEl.querySelectorAll("[data-remove]").forEach((btn) => {
@@ -112,10 +110,12 @@
         persist();
       });
     });
-    machineListEl.querySelectorAll("[data-field='article']").forEach((sel) => {
-      sel.addEventListener("change", () => {
-        const m = machines.find((x) => x.id === sel.dataset.id);
-        m.articleCode = sel.value;
+    machineListEl.querySelectorAll("[data-combo-input]").forEach((inp) => {
+      const machineId = inp.dataset.comboInput.replace(/^d-/, "");
+      const m = machines.find((x) => x.id === machineId);
+      if (!m) return;
+      core.bindArticleCombo(inp, m._labelToCode, (code) => {
+        m.articleCode = code || "";
         computeAll();
         persist();
       });

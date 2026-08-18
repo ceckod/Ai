@@ -368,13 +368,25 @@
     return { count: rates.length, confirmed, value, unit, spread };
   }
 
-  // ефективен темп = ръчна матрица+удар (ако е включено) ИЛИ умно изчисленото
+  // ефективен темп: ръчна матрица+удар → замразен (потвърден) цикъл → умно изчисленото от записите
+  // (приоритетът съвпада с core.effectiveCycle() в helfi-core.js)
   function effectiveRate(article, stats) {
     if (article.useManualCycle && article.matrixCavities > 0 && article.strokeSeconds > 0) {
       return {
         value: (article.matrixCavities * 3600) / article.strokeSeconds,
         unit: "бутилки/час",
         source: "manual",
+        matrixCavities: article.matrixCavities,
+        strokeSeconds: article.strokeSeconds,
+      };
+    }
+    if (article.frozen && article.frozenCycleSeconds > 0 && article.matrixCavities > 0) {
+      return {
+        value: (article.matrixCavities * 3600) / article.frozenCycleSeconds,
+        unit: "бутилки/час",
+        source: "frozen",
+        matrixCavities: article.matrixCavities,
+        strokeSeconds: article.frozenCycleSeconds,
       };
     }
     if (stats.count > 0) {
@@ -524,9 +536,8 @@
     }
 
     if (a.matrixCavities > 0 && a.strokeSeconds > 0) {
-      const secPerBottle = a.strokeSeconds / a.matrixCavities;
       const bottlesPerHour = (a.matrixCavities * 3600) / a.strokeSeconds;
-      cycleDerived.textContent = `= ${fmtNum(secPerBottle, 2)} сек/бутилка · ${fmtNum(bottlesPerHour, 0)} бутилки/час`;
+      cycleDerived.textContent = `= 1 удар на ${fmtNum(a.strokeSeconds, 2)} сек → ${fmtNum(a.matrixCavities, 0)} бутилки наведнъж (среден темп ${fmtNum(bottlesPerHour, 0)} бутилки/час)`;
     } else {
       cycleDerived.textContent = "";
     }
@@ -541,7 +552,9 @@
       statsBadge.textContent = "";
       statsBody.innerHTML = `<p class="hint">Все още няма записи от производство за този артикул.</p>`;
     } else {
-      if (eff.source === "manual") {
+      if (eff.source === "frozen") {
+        statsBadge.innerHTML = `<span class="badge confirmed">🔒 замразен цикъл (потвърден)</span>`;
+      } else if (eff.source === "manual") {
         statsBadge.innerHTML = `<span class="badge confirmed">ръчно зададен (матрица × удар)</span>`;
       } else if (stats.confirmed) {
         statsBadge.innerHTML = `<span class="badge confirmed">потвърден · последните ${MIN_CONFIRM} съвпадат</span>`;
@@ -554,9 +567,27 @@
       const rows = [];
       rows.push(`<div class="stat-row"><span>Темп на производство</span><b>${fmtNum(eff.value, 0)} ${eff.unit}</b></div>`);
 
-      if (a.bottlesPerUnit) {
+      if (eff.matrixCavities && eff.strokeSeconds) {
+        // знаем точно матрицата и времето за удар -> смятаме на цели удари
+        // (напр. матрица 3: винаги по 3 бутилки наведнъж, никога "по 1")
+        rows.push(`<div class="stat-row"><span>1 удар</span><b>${fmtNum(eff.strokeSeconds, 2)} сек → ${fmtNum(eff.matrixCavities, 0)} бутилки</b></div>`);
+
+        if (a.bottlesPerUnit) {
+          const hitsPerUnit = Math.ceil(a.bottlesPerUnit / eff.matrixCavities);
+          const timePerUnitH = (hitsPerUnit * eff.strokeSeconds) / 3600;
+          rows.push(`<div class="stat-row"><span>Удари за 1 ${unitLabel(a, false)}</span><b>${fmtNum(hitsPerUnit, 0)} удара · ${fmtHM(timePerUnitH)}</b></div>`);
+          if (a.unitsPerPallet) {
+            const hitsPerPallet = Math.ceil((a.bottlesPerUnit * a.unitsPerPallet) / eff.matrixCavities);
+            const timePerPalletH = (hitsPerPallet * eff.strokeSeconds) / 3600;
+            rows.push(`<div class="stat-row highlight"><span>Време за 1 пале</span><b>${fmtHM(timePerPalletH)}</b></div>`);
+          }
+        } else {
+          rows.push(`<p class="hint">Въведи бутилки в ${unitLabel(a, false)}, за да видиш удари/време за 1 ${unitLabel(a, false)} и за пале.</p>`);
+        }
+      } else if (a.bottlesPerUnit) {
+        // няма позната матрица/удар (само "умен" темп от записите) -> оценка по среден темп
         const cycleSec = 3600 / eff.value;
-        rows.push(`<div class="stat-row"><span>Цикъл на бутилка</span><b>${fmtNum(cycleSec, 2)} сек</b></div>`);
+        rows.push(`<div class="stat-row"><span>Среден цикъл на бутилка</span><b>${fmtNum(cycleSec, 2)} сек</b></div>`);
         const timePerUnitH = a.bottlesPerUnit / eff.value;
         rows.push(`<div class="stat-row"><span>Време за 1 ${unitLabel(a, false)}</span><b>${fmtHM(timePerUnitH)}</b></div>`);
         if (a.unitsPerPallet) {
@@ -571,7 +602,7 @@
         rows.push(`<p class="hint">Въведи бутилки в ${unitLabel(a, false)}, за да видиш и цикъла в секунди на бутилка.</p>`);
       }
 
-      if (eff.source === "manual" && stats.count > 0) {
+      if ((eff.source === "manual" || eff.source === "frozen") && stats.count > 0) {
         rows.push(`<p class="hint">Умният код изчислява (за сравнение): ${fmtNum(stats.value, 0)} ${stats.unit}${stats.confirmed ? " · потвърдено" : " · калибрира се"}.</p>`);
       }
 
@@ -704,7 +735,7 @@
     a.bottlesPerUnit = specBottles.value ? Number(specBottles.value) : null;
     a.unitsPerPallet = specUnitsPerPallet.value ? Number(specUnitsPerPallet.value) : null;
     a.useManualCycle = !!specUseManualCycle.checked;
-    a.matrixCavities = specMatrixCavities.value ? Number(specMatrixCavities.value) : null;
+    a.matrixCavities = specMatrixCavities.value ? Math.round(Number(specMatrixCavities.value)) : null;
     a.strokeSeconds = specStrokeSeconds.value ? Number(specStrokeSeconds.value) : null;
     saveState();
     renderDetail();

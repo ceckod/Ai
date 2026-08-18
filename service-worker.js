@@ -1,7 +1,10 @@
 // Helfi Plastics — service worker
-// Проста offline-кеш логика. Ще расте с приложението.
+// Network-first: винаги пробва прясна версия от мрежата първо, пази копие
+// в кеша само като резерва за офлайн режим. Така ъпдейтите на js/html
+// файловете се виждат веднага, вместо телефонът да "залепне" за стара
+// кеширана версия (напр. стар бъгав js/agent.js).
 
-const CACHE_NAME = "helfi-cache-v1";
+const CACHE_NAME = "helfi-cache-v2";
 const CORE_ASSETS = [
   "/",
   "/index.html",
@@ -34,12 +37,17 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return (
-        cached ||
-        fetch(event.request).catch(() => caches.match("/index.html"))
-      );
-    })
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() =>
+        caches.match(event.request).then((cached) => cached || caches.match("/index.html"))
+      )
   );
 });

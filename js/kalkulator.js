@@ -29,7 +29,7 @@
     articleCodes = Object.keys(articles).sort((a, b) => a.localeCompare(b));
     renderMachineRows();
     computeTrays();
-    timeArticleSelect.innerHTML = articleOptionsHtml(timeArticleSelect.value);
+    renderTimeArticleCombo();
     computeTime();
   }
   window.addEventListener("storage", (e) => {
@@ -65,15 +65,6 @@
 
   let machineRows = []; // {id, articleCode}
 
-  function articleOptionsHtml(selected) {
-    let html = `<option value="">— ръчно въвеждане —</option>`;
-    articleCodes.forEach((code) => {
-      const a = articles[code];
-      html += `<option value="${code}" ${code === selected ? "selected" : ""}>${a.code} — ${a.name}</option>`;
-    });
-    return html;
-  }
-
   function addMachineRow() {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     machineRows.push({ id, articleCode: "" });
@@ -82,8 +73,15 @@
 
   function renderMachineRows() {
     machineListEl.innerHTML = machineRows
-      .map(
-        (row, idx) => `
+      .map((row, idx) => {
+        const combo = core.articleComboHtml({
+          id: `m-${row.id}`,
+          articles,
+          value: row.articleCode,
+          placeholder: "Пиши код или име (напр. 415 или премиум)…",
+        });
+        row._labelToCode = combo.labelToCode;
+        return `
       <div class="machine-row" data-id="${row.id}">
         <div class="machine-row-head">
           <b>Машина ${idx + 1}</b>
@@ -91,21 +89,21 @@
         </div>
         <label style="font-size:0.76rem;color:var(--text-dim);display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
           Артикул (по избор — попълва данните автоматично)
-          <select data-field="article" data-id="${row.id}">${articleOptionsHtml(row.articleCode)}</select>
+          ${combo.html}
         </label>
         <div class="spec-grid">
           <label>Бутилки в тава/чувал
             <input type="number" min="1" data-field="bottlesPerTray" data-id="${row.id}" value="${row.bottlesPerTray ?? ""}" placeholder="напр. 400" />
           </label>
           <label>Бутилки на удар (матрица)
-            <input type="number" min="1" max="6" data-field="bottlesPerHit" data-id="${row.id}" value="${row.bottlesPerHit ?? ""}" placeholder="напр. 3" />
+            <input type="number" min="1" max="6" step="1" data-field="bottlesPerHit" data-id="${row.id}" value="${row.bottlesPerHit ?? ""}" placeholder="напр. 3" />
           </label>
           <label>Време за 1 удар (сек)
             <input type="number" min="0" step="0.01" data-field="secPerHit" data-id="${row.id}" value="${row.secPerHit ?? ""}" placeholder="напр. 16" />
           </label>
         </div>
-      </div>`
-      )
+      </div>`;
+      })
       .join("");
 
     machineListEl.querySelectorAll("[data-remove]").forEach((btn) => {
@@ -116,11 +114,13 @@
       });
     });
 
-    machineListEl.querySelectorAll("select[data-field='article']").forEach((sel) => {
-      sel.addEventListener("change", () => {
-        const row = machineRows.find((r) => r.id === sel.dataset.id);
-        row.articleCode = sel.value;
-        const a = articles[sel.value];
+    machineListEl.querySelectorAll("[data-combo-input]").forEach((inp) => {
+      const rowId = inp.dataset.comboInput.replace(/^m-/, "");
+      const row = machineRows.find((r) => r.id === rowId);
+      if (!row) return;
+      core.bindArticleCombo(inp, row._labelToCode, (code) => {
+        row.articleCode = code || "";
+        const a = code ? articles[code] : null;
         if (a) {
           const cyc = core.effectiveCycle(a);
           row.bottlesPerTray = a.bottlesPerUnit || row.bottlesPerTray;
@@ -202,26 +202,38 @@
   addMachineBtn.addEventListener("click", addMachineRow);
 
   // ================= РЕЖИМ Б: време за зададен брой тави =================
-  const timeArticleSelect = document.getElementById("timeArticleSelect");
+  const timeArticleWrap = document.getElementById("timeArticleWrap");
   const timeBottlesPerTray = document.getElementById("timeBottlesPerTray");
   const timeBottlesPerHit = document.getElementById("timeBottlesPerHit");
   const timeSecPerHit = document.getElementById("timeSecPerHit");
   const timeDesiredTrays = document.getElementById("timeDesiredTrays");
   const timeResultsEl = document.getElementById("timeResults");
+  let timeArticleCode = "";
 
-  timeArticleSelect.innerHTML = articleOptionsHtml("");
-  timeArticleSelect.addEventListener("change", () => {
-    const a = articles[timeArticleSelect.value];
-    if (a) {
-      if (a.bottlesPerUnit) timeBottlesPerTray.value = a.bottlesPerUnit;
-      const cyc = core.effectiveCycle(a);
-      if (cyc && cyc.matrixCavities && cyc.strokeSeconds) {
-        timeBottlesPerHit.value = cyc.matrixCavities;
-        timeSecPerHit.value = cyc.strokeSeconds;
+  function renderTimeArticleCombo() {
+    const combo = core.articleComboHtml({
+      id: "time-article",
+      articles,
+      value: timeArticleCode,
+      placeholder: "Пиши код или име (напр. 415 или премиум)…",
+    });
+    timeArticleWrap.innerHTML = combo.html;
+    const inp = timeArticleWrap.querySelector("[data-combo-input]");
+    core.bindArticleCombo(inp, combo.labelToCode, (code) => {
+      timeArticleCode = code || "";
+      const a = code ? articles[code] : null;
+      if (a) {
+        if (a.bottlesPerUnit) timeBottlesPerTray.value = a.bottlesPerUnit;
+        const cyc = core.effectiveCycle(a);
+        if (cyc && cyc.matrixCavities && cyc.strokeSeconds) {
+          timeBottlesPerHit.value = cyc.matrixCavities;
+          timeSecPerHit.value = cyc.strokeSeconds;
+        }
       }
-    }
-    computeTime();
-  });
+      computeTime();
+    });
+  }
+  renderTimeArticleCombo();
 
   function computeTime() {
     const bottlesPerTray = Number(timeBottlesPerTray.value);
@@ -234,7 +246,7 @@
       return;
     }
 
-    const a = articles[timeArticleSelect.value];
+    const a = articles[timeArticleCode];
     const unit = unitLabelFor(a) === "стек/чувал" ? "стека/чувала" : "тави";
 
     const totalBottlesNeeded = desiredTrays * bottlesPerTray;

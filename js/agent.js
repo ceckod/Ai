@@ -56,9 +56,10 @@
           padding: 8px 12px; font-weight: 600; font-size: 0.8rem; cursor: pointer;
         }
         .helfi-agent-fallback { padding: 10px 12px; border-top: 1px solid #263252; font-size: 0.78rem; }
-        .helfi-agent-fallback select {
+        .helfi-agent-fallback select, .helfi-agent-fallback input[type="text"] {
           width: 100%; background: #1b2740; border: 1px solid #263252; color: #e7ecef;
           border-radius: 8px; padding: 7px 8px; font-size: 0.78rem; margin-top: 4px; margin-bottom: 6px;
+          box-sizing: border-box; font-family: "Inter", sans-serif;
         }
         .helfi-agent-fallback button {
           background: transparent; border: 1px solid #263252; color: #8e9bb3;
@@ -96,7 +97,7 @@
       <div class="helfi-agent-fallback">
         Не разпозна ли нещо? Избери ръчно:
         <select id="helfiAgentMachineSel"></select>
-        <select id="helfiAgentArticleSel"></select>
+        <span id="helfiAgentArticleWrap"></span>
         <button id="helfiAgentAskBtn">Попитай с избраните</button>
       </div>
     `;
@@ -106,9 +107,10 @@
     const inputEl = panel.querySelector("#helfiAgentInput");
     const sendBtn = panel.querySelector("#helfiAgentSend");
     const machineSel = panel.querySelector("#helfiAgentMachineSel");
-    const articleSel = panel.querySelector("#helfiAgentArticleSel");
+    const articleWrap = panel.querySelector("#helfiAgentArticleWrap");
     const askBtn = panel.querySelector("#helfiAgentAskBtn");
     const closeBtn = panel.querySelector("#helfiAgentClose");
+    let fallbackArticleCode = "";
 
     function addMsg(text, who) {
       const div = document.createElement("div");
@@ -149,10 +151,17 @@
         machines.map((m) => `<option value="${m.id}">${m.name}</option>`).join("");
 
       const articles = core.loadArticles();
-      const codes = Object.keys(articles).sort((a, b) => a.localeCompare(b));
-      articleSel.innerHTML =
-        `<option value="">— без бутилка (от машината) —</option>` +
-        codes.map((c) => `<option value="${c}">${articles[c].code} — ${articles[c].name}</option>`).join("");
+      const combo = core.articleComboHtml({
+        id: "agent-article",
+        articles,
+        value: fallbackArticleCode,
+        placeholder: "Пиши код или име (напр. 415 или премиум)…",
+      });
+      articleWrap.innerHTML = combo.html;
+      const inp = articleWrap.querySelector("[data-combo-input]");
+      core.bindArticleCombo(inp, combo.labelToCode, (code) => {
+        fallbackArticleCode = code || "";
+      });
     }
 
     // ---------------- разпознаване на текст ----------------
@@ -257,7 +266,7 @@
       const machines = todaysDispatchMachines();
       const articles = core.loadArticles();
       const machine = machines.find((m) => m.id === machineSel.value) || null;
-      let article = articleSel.value ? articles[articleSel.value] : null;
+      let article = fallbackArticleCode ? articles[fallbackArticleCode] : null;
       if (!article && machine && machine.articleCode) article = articles[machine.articleCode];
 
       const label = [machine ? machine.name : null, article ? `${article.code} — ${article.name}` : null].filter(Boolean).join(" · ");

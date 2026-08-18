@@ -184,6 +184,60 @@
     return `${h} ч ${m} мин`;
   }
 
+  // ---------------- търсещо поле за артикул (input + datalist) ----------------
+  // Заменя дълъг <select> с 1000 реда: пишеш "415" или "премиум" и списъкът
+  // сам се стеснява до съвпаденията (нативно филтриране на браузъра).
+  function articleLabel(article) {
+    return `${article.code} — ${article.name}`;
+  }
+
+  // връща {optionsHtml, labelToCode} за подаден списък артикули
+  function articleDatalistData(articles) {
+    const codes = Object.keys(articles).sort((a, b) => a.localeCompare(b));
+    const labelToCode = {};
+    let optionsHtml = "";
+    codes.forEach((code) => {
+      const label = articleLabel(articles[code]);
+      labelToCode[label] = code;
+      const esc = label.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      optionsHtml += `<option value="${esc}"></option>`;
+    });
+    return { optionsHtml, labelToCode };
+  }
+
+  // генерира HTML за <input list="..."> + <datalist> двойка
+  // value = текущо избран код (по избор), placeholder = текст, когато е празно
+  function articleComboHtml({ id, articles, value, placeholder }) {
+    const { optionsHtml, labelToCode } = articleDatalistData(articles);
+    const currentLabel = value && articles[value] ? articleLabel(articles[value]) : "";
+    const dlId = `dl-${id}`;
+    return {
+      labelToCode,
+      html: `
+        <input type="text" list="${dlId}" data-combo-input="${id}" value="${currentLabel}"
+               placeholder="${placeholder || "Пиши код или име…"}" autocomplete="off" />
+        <datalist id="${dlId}">${optionsHtml}</datalist>
+      `,
+    };
+  }
+
+  // закача change/input слушатели на вече вмъкнато combo поле.
+  // onSelect(code|null) се вика с кода на артикула (или null при изчистено/непознато поле).
+  function bindArticleCombo(inputEl, labelToCode, onSelect) {
+    inputEl.addEventListener("change", () => {
+      const val = inputEl.value.trim();
+      if (val === "") {
+        onSelect(null);
+        return;
+      }
+      if (labelToCode[val]) {
+        onSelect(labelToCode[val]);
+      }
+      // ако текстът не съвпада точно с опция от списъка (все още се пише),
+      // не пипаме избора — изчаква да избере от списъка или да изчисти полето
+    });
+  }
+
   global.HelfiCore = {
     STORAGE_KEY,
     DISPATCH_KEY,
@@ -200,5 +254,9 @@
     saveDispatchForShift,
     fmtNum,
     fmtHM,
+    articleLabel,
+    articleDatalistData,
+    articleComboHtml,
+    bindArticleCombo,
   };
 })(window);
