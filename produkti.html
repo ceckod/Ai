@@ -43,7 +43,7 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 12px;
-    margin-bottom: 20px;
+    margin-bottom: 8px;
   }
   h1 {
     font-family: var(--font-display);
@@ -56,7 +56,7 @@
     font-size: 0.85rem;
     margin: 4px 0 0;
   }
-  .navlinks { display: flex; gap: 8px; flex-wrap: wrap; }
+  .navlinks { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .navlink {
     color: var(--text-dim);
     font-size: 0.85rem;
@@ -64,8 +64,28 @@
     border: 1px solid var(--line);
     padding: 8px 14px;
     border-radius: 10px;
+    background: none;
+    cursor: pointer;
+    font-family: var(--font-body);
   }
   .navlink:hover { border-color: var(--accent); color: var(--accent); }
+
+  #statusRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin: 0 0 18px;
+  }
+  #whoami { font-family: var(--font-mono); color: var(--accent); }
+  #commitStatus { font-family: var(--font-mono); }
+
+  /* елементи, видими САМО когато е влязъл с GitHub */
+  .edit-only { display: none; }
+  body.edit-mode .edit-only { display: block; }
+  body.edit-mode .edit-only.inline { display: inline-flex; }
 
   .card {
     background: var(--surface);
@@ -90,7 +110,7 @@
   }
   .hint { color: var(--text-dim); font-size: 0.78rem; margin: 4px 0; }
 
-  .text-input, input[type="text"], input[type="number"], input[type="date"] {
+  .text-input, input[type="text"], input[type="number"], input[type="date"], input[type="password"] {
     background: var(--surface-2);
     border: 1px solid var(--line);
     color: var(--text);
@@ -99,6 +119,10 @@
     font-family: var(--font-body);
     font-size: 0.85rem;
     width: 100%;
+  }
+  input:disabled {
+    opacity: 0.75;
+    cursor: default;
   }
   .btn {
     background: var(--accent);
@@ -112,6 +136,7 @@
     font-family: var(--font-body);
   }
   .btn:hover { background: #6fe0d5; }
+  .btn:disabled { opacity: 0.6; cursor: default; }
   .ghost-btn {
     background: transparent;
     border: 1px solid var(--line);
@@ -123,6 +148,48 @@
     font-family: var(--font-body);
   }
   .ghost-btn:hover { border-color: #e05d5d; color: #e05d5d; }
+
+  .login-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .login-grid label {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  #loginError {
+    color: #e88;
+    font-size: 0.8rem;
+    margin: 8px 0 0;
+    min-height: 1em;
+  }
+  .steps {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+  .steps code {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: var(--font-mono);
+    color: var(--accent);
+    font-size: 0.76rem;
+  }
+  details.howto { margin-top: 10px; }
+  details.howto summary {
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--accent);
+  }
 
   #articleSummary {
     font-size: 0.78rem;
@@ -262,11 +329,52 @@
       <p class="sub">Опаковка (тава / стек / пале) и самонадграждащ се производствен цикъл</p>
     </div>
     <div class="navlinks">
-      <span class="navlink" id="syncStatus" style="cursor:default">💾 локално</span>
+      <button id="logoutBtn" class="navlink" hidden>Изход</button>
       <a href="smeni.html" class="navlink">Смени</a>
       <a href="index.html" class="navlink">← Начало</a>
     </div>
   </header>
+  <div id="statusRow">
+    <span id="whoami"></span>
+    <span id="commitStatus"></span>
+  </div>
+
+  <div class="card" id="loginCard">
+    <h3>🔓 Вход с GitHub</h3>
+    <p class="card-sub">
+      Влизаш веднъж с "ключ" (token) за своя repo. След вход виждаш пълните форми
+      за редакция — всяка промяна прави commit директно в GitHub, автоматично.
+      Без вход страницата е само за преглед.
+    </p>
+    <form id="loginForm">
+      <div class="login-grid">
+        <label>GitHub потребител/организация
+          <input type="text" id="ghOwner" placeholder="напр. ivanov" required />
+        </label>
+        <label>Repo (име на хранилището)
+          <input type="text" id="ghRepo" placeholder="напр. helfi-main" required />
+        </label>
+        <label>Branch (по избор)
+          <input type="text" id="ghBranch" placeholder="main" />
+        </label>
+        <label>Personal Access Token
+          <input type="password" id="ghToken" placeholder="ghp_… или github_pat_…" required />
+        </label>
+      </div>
+      <button id="loginBtn" type="submit" class="btn">Вход</button>
+      <p id="loginError"></p>
+    </form>
+    <details class="howto">
+      <summary>Как да си направя такъв ключ (1 минута)</summary>
+      <ol class="steps">
+        <li>Отвори <code>github.com/settings/tokens?type=beta</code></li>
+        <li>Натисни <b>"Generate new token"</b> (fine-grained)</li>
+        <li>Дай име, избери <b>Repository access → Only select repositories</b> → избери своя repo</li>
+        <li>Под <b>Permissions → Repository permissions</b> намери <b>Contents</b> и избери <b>Read and write</b></li>
+        <li>Генерирай и копирай ключа (показва се само веднъж) — постави го в полето по-горе</li>
+      </ol>
+    </details>
+  </div>
 
   <div class="card">
     <h3>Избери артикул</h3>
@@ -281,7 +389,7 @@
         <span class="detail-code" id="dCode"></span>
         <h2 id="dName"></h2>
       </div>
-      <button id="deleteArticleBtn" class="ghost-btn">Изтрий артикул</button>
+      <button id="deleteArticleBtn" class="ghost-btn edit-only inline">Изтрий артикул</button>
     </div>
 
     <div class="card" style="background:var(--surface-2);margin-bottom:14px">
@@ -300,7 +408,7 @@
       <p class="spec-derived" id="specDerived"></p>
     </div>
 
-    <div class="card" style="background:var(--surface-2);margin-bottom:14px">
+    <div class="card edit-only" style="background:var(--surface-2);margin-bottom:14px">
       <h3>Нов запис от производство</h3>
       <p class="card-sub">Въведи машина, дата, отработени часове и произведени тави — цикълът се преизчислява автоматично.</p>
       <div class="log-form">
@@ -323,7 +431,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card edit-only">
     <h3>Добави нов артикул</h3>
     <div class="search-controls">
       <input type="text" id="newCode" class="text-input" placeholder="Код (напр. H500-99)" style="max-width:160px" />
@@ -334,20 +442,11 @@
 
   <div class="card">
     <h3>Резервно копие</h3>
-    <p class="card-sub">Данните се пазят локално в този браузър. Изтегли ги, ако искаш да ги пренесеш на друго устройство или да не ги загубиш.</p>
-    <div class="search-controls">
-      <button id="exportBtn" class="btn">Изтегли JSON</button>
-      <label class="ghost-btn" style="cursor:pointer">
-        Качи JSON
-        <input type="file" id="importFile" accept="application/json" hidden />
-      </label>
-    </div>
+    <p class="card-sub">По желание — сваля моментна снимка на данните като файл.</p>
+    <button id="exportBtn" class="btn">Изтегли JSON</button>
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="js/firebase-config.js"></script>
 <script src="js/clock.js"></script>
 <script src="js/products.js"></script>
 </body>
