@@ -1,0 +1,66 @@
+name: Unpack Upload
+
+# Качваш .zip файл в папка _upload/ (през GitHub → Add file → Upload files).
+# Този workflow сам го разархивира в правилните места в проекта, трие
+# zip-а и прави commit — не се налага ръчно разархивиране и качване на
+# файлове един по един.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "_upload/**"
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    # предпазва от безкраен цикъл: не се стартира при commit, направен от самия action
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Разархивирай качения zip
+        run: |
+          set -e
+          shopt -s nullglob
+          zips=(_upload/*.zip _upload/*.ZIP)
+          if [ ${#zips[@]} -eq 0 ]; then
+            echo "Няма zip файлове за разархивиране в _upload/."
+            exit 0
+          fi
+
+          for z in "${zips[@]}"; do
+            echo "== Разархивирам: $z =="
+            tmp="$(mktemp -d)"
+            unzip -o -q "$z" -d "$tmp"
+
+            # ако архивът съдържа една обща папка (напр. helfi-main/), влизаме в нея
+            entries=("$tmp"/*)
+            if [ ${#entries[@]} -eq 1 ] && [ -d "${entries[0]}" ]; then
+              src="${entries[0]}"
+            else
+              src="$tmp"
+            fi
+
+            # копираме върху текущия проект, без да пипаме .git и _upload
+            rsync -a --exclude ".git/" --exclude "_upload/" "$src"/ ./
+
+            rm -rf "$tmp"
+            rm -f "$z"
+          done
+
+      - name: Commit промените
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Няма промени за commit."
+            exit 0
+          fi
+          git commit -m "Автоматично разархивиране на качен zip от _upload/"
+          git push
