@@ -96,7 +96,7 @@
             <input type="number" min="1" data-field="bottlesPerTray" data-id="${row.id}" value="${row.bottlesPerTray ?? ""}" placeholder="напр. 400" />
           </label>
           <label>Бутилки на удар (матрица)
-            <input type="number" min="1" data-field="bottlesPerHit" data-id="${row.id}" value="${row.bottlesPerHit ?? ""}" placeholder="напр. 3" />
+            <input type="number" min="1" max="6" data-field="bottlesPerHit" data-id="${row.id}" value="${row.bottlesPerHit ?? ""}" placeholder="напр. 3" />
           </label>
           <label>Време за 1 удар (сек)
             <input type="number" min="0" step="0.01" data-field="secPerHit" data-id="${row.id}" value="${row.secPerHit ?? ""}" placeholder="напр. 16" />
