@@ -1,0 +1,524 @@
+{
+  "articles": {
+    "H415-68": {
+      "code": "H415-68",
+      "name": "415мл премиум",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H100-74": {
+      "code": "H100-74",
+      "name": "100мл спирт",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H500-81": {
+      "code": "H500-81",
+      "name": "500мл Веджи уош",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H750-67": {
+      "code": "H750-67",
+      "name": "750мл премиум",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H120-75": {
+      "code": "H120-75",
+      "name": "120мл флакон",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H150-70": {
+      "code": "H150-70",
+      "name": "150мл флакон",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H200-71": {
+      "code": "H200-71",
+      "name": "200мл флакон",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H300-72": {
+      "code": "H300-72",
+      "name": "300мл флакон",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H400-69": {
+      "code": "H400-69",
+      "name": "400мл течен сапун",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H050-73": {
+      "code": "H050-73",
+      "name": "50мл спирт",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H500-76": {
+      "code": "H500-76",
+      "name": "500мл 38мм",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H750-80": {
+      "code": "H750-80",
+      "name": "750мл пръскалка",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H500-77": {
+      "code": "H500-77",
+      "name": "Флакон вода за уста 500мл",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H830-62": {
+      "code": "H830-62",
+      "name": "830мл балсам",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H125-61": {
+      "code": "H125-61",
+      "name": "125мл фармация",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H230-60": {
+      "code": "H230-60",
+      "name": "230мл флакон",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H330-44": {
+      "code": "H330-44",
+      "name": "330мл фреш",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H030-59": {
+      "code": "H030-59",
+      "name": "30мл хотел",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H300-56": {
+      "code": "H300-56",
+      "name": "300мл кетчуп Оберон",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H1000-55": {
+      "code": "H1000-55",
+      "name": "1 литър кетчуп",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H500-54": {
+      "code": "H500-54",
+      "name": "500мл кетчуп Оберон",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H250-53": {
+      "code": "H250-53",
+      "name": "250мл сос Денито",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H1000-57": {
+      "code": "H1000-57",
+      "name": "1 литър олио HOSSO",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H900-58": {
+      "code": "H900-58",
+      "name": "900мл кетчуп Оберон",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "GAL19D": {
+      "code": "GAL19D",
+      "name": "19 литра галон с дръжка",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H2000-47": {
+      "code": "H2000-47",
+      "name": "2000мл бъклица",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H1000-46": {
+      "code": "H1000-46",
+      "name": "1000мл фреш",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H750-41": {
+      "code": "H750-41",
+      "name": "750мл шампоан",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H700-48": {
+      "code": "H700-48",
+      "name": "700мл кулинар",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H500-45": {
+      "code": "H500-45",
+      "name": "500мл фреш",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H500-45B": {
+      "code": "H500-45B",
+      "name": "500мл фреш (бял)",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H500-49": {
+      "code": "H500-49",
+      "name": "500мл пръскалка",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H500-40": {
+      "code": "H500-40",
+      "name": "500мл веро",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H300-43": {
+      "code": "H300-43",
+      "name": "300мл фреш",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H200-50": {
+      "code": "H200-50",
+      "name": "200мл алкохол",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "GAL19": {
+      "code": "GAL19",
+      "name": "19 литрови бутилки (галони)",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H025-42": {
+      "code": "H025-42",
+      "name": "25мл хотел",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H250-22": {
+      "code": "H250-22",
+      "name": "250мл фармация",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H200-21": {
+      "code": "H200-21",
+      "name": "200мл фармация",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H150-12": {
+      "code": "H150-12",
+      "name": "150мл фармация",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H200-36": {
+      "code": "H200-36",
+      "name": "200мл флакон",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H150-31": {
+      "code": "H150-31",
+      "name": "150мл флакон",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H100-35": {
+      "code": "H100-35",
+      "name": "100мл флакон",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H200-23": {
+      "code": "H200-23",
+      "name": "200мл Black Ram",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H250-13": {
+      "code": "H250-13",
+      "name": "250мл сос",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H200-11": {
+      "code": "H200-11",
+      "name": "200мл алкохол",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H1000-26": {
+      "code": "H1000-26",
+      "name": "1000мл 42мм",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H1000-29": {
+      "code": "H1000-29",
+      "name": "1000мл пръскалка",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H750-25": {
+      "code": "H750-25",
+      "name": "750мл пръскалка",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H1000-20": {
+      "code": "H1000-20",
+      "name": "1000мл супер гел",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H900-39": {
+      "code": "H900-39",
+      "name": "900мл супер гел",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H1000-19": {
+      "code": "H1000-19",
+      "name": "1000мл балсам",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H900-38": {
+      "code": "H900-38",
+      "name": "900мл балсам",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H1000-18": {
+      "code": "H1000-18",
+      "name": "1000мл подови настилки",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H500-37": {
+      "code": "H500-37",
+      "name": "500мл веро",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H900-34": {
+      "code": "H900-34",
+      "name": "900мл AVA",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H625-33": {
+      "code": "H625-33",
+      "name": "625мл AVA",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H425-32": {
+      "code": "H425-32",
+      "name": "425мл AVA",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H1000-28": {
+      "code": "H1000-28",
+      "name": "1000мл Планет",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H625-30": {
+      "code": "H625-30",
+      "name": "625мл Планет",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H500-17": {
+      "code": "H500-17",
+      "name": "500мл Планет",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H425-27": {
+      "code": "H425-27",
+      "name": "425мл Планет",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H1000-16": {
+      "code": "H1000-16",
+      "name": "1000мл душ гел",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H500-14": {
+      "code": "H500-14",
+      "name": "500мл душ гел",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    },
+    "H300-15": {
+      "code": "H300-15",
+      "name": "300мл течен сапун",
+      "bottlesPerTray": null,
+      "traysPerStack": null,
+      "stacksPerPallet": null,
+      "logs": []
+    }
+  }
+}
