@@ -252,6 +252,26 @@
     flex-wrap: wrap;
     align-items: center;
   }
+
+  .cat-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .cat-tab {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 0.72rem;
+    cursor: pointer;
+    font-family: var(--font-body);
+    white-space: nowrap;
+  }
+  .cat-tab:hover { border-color: var(--accent); color: var(--text); }
+  .cat-tab.active { background: var(--accent); border-color: var(--accent); color: #08302c; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -271,6 +291,7 @@
   <div class="card">
     <h3>Избери артикул</h3>
     <p class="card-sub" id="articleSummary"></p>
+    <div id="catTabs" class="cat-tabs"></div>
     <input type="text" id="articleSearch" class="text-input" placeholder="Търси по код или име (напр. H500 или кетчуп)…" style="margin-bottom:10px" />
     <div id="articleList" class="article-list"></div>
   </div>
@@ -287,33 +308,27 @@
     <div class="card" style="background:var(--surface-2);margin-bottom:14px">
       <h3>Опаковка</h3>
       <div class="spec-grid">
+        <label>Категория
+          <select id="specCategory">
+            <option value="household">Битова химия и козметика</option>
+            <option value="water">Бутилки за вода</option>
+            <option value="pharma">Фармация</option>
+            <option value="food">Хранителна промишленост</option>
+            <option value="supplements">Хранителни добавки</option>
+            <option value="other">Друго</option>
+          </select>
+        </label>
         <label>Пакетажът е в
           <select id="specUnit">
             <option value="tray">Тава</option>
             <option value="stack">Стек / чувал</option>
           </select>
         </label>
-        <label>Бутилки в <span class="unit-lbl-1">тава</span> (матрица)
-          <input type="number" id="specBottles" min="0" placeholder="напр. 24" />
+        <label>Бутилки в <span class="unit-lbl-1">тава</span>
+          <input type="number" id="specBottles" min="0" placeholder="напр. 400" />
         </label>
-      </div>
-
-      <p class="hint" style="margin-top:12px;margin-bottom:0">Пале</p>
-      <div class="spec-grid">
-        <label>Лимитът на палето е по
-          <select id="specPalletMode">
-            <option value="count">Брой <span class="unit-lbl-2">тави</span></option>
-            <option value="height">Височина</option>
-          </select>
-        </label>
-        <label id="fieldUnitsPerPallet"><span class="unit-lbl-1cap">Тави</span> на пале
-          <input type="number" id="specUnitsPerPallet" min="0" placeholder="напр. 60" />
-        </label>
-        <label id="fieldUnitHeight" hidden>Височина на 1 <span class="unit-lbl-1">тава</span> (мм)
-          <input type="number" id="specUnitHeight" min="0" placeholder="напр. 180" />
-        </label>
-        <label id="fieldPalletMaxHeight" hidden>Макс. височина на пале (мм)
-          <input type="number" id="specPalletMaxHeight" min="0" placeholder="напр. 1600" />
+        <label><span class="unit-lbl-1cap">Тави</span> на пале
+          <input type="number" id="specUnitsPerPallet" min="0" placeholder="напр. 13" />
         </label>
       </div>
       <p class="spec-derived" id="specDerived"></p>
@@ -321,16 +336,20 @@
 
     <div class="card" style="background:var(--surface-2);margin-bottom:14px">
       <h3>Време за цикъл</h3>
-      <p class="card-sub">По подразбиране цикълът се смята автоматично от записите (умния код). Може и сам да го зададеш.</p>
+      <p class="card-sub">По подразбиране цикълът се смята автоматично от записите (умния код). Може и сам да го зададеш по матрицата на машината.</p>
       <div class="spec-grid">
         <label style="flex-direction:row;align-items:center;gap:8px">
           <input type="checkbox" id="specUseManualCycle" style="width:auto" />
           Ръчно зададен цикъл
         </label>
-        <label>Секунди на 1 бутилка
-          <input type="number" id="specManualCycle" step="0.01" min="0" placeholder="напр. 1.20" />
+        <label>Матрица (бутилки на удар)
+          <input type="number" id="specMatrixCavities" min="1" max="8" step="1" placeholder="напр. 3" />
+        </label>
+        <label>Време за 1 удар (сек)
+          <input type="number" id="specStrokeSeconds" step="0.1" min="0" placeholder="напр. 16" />
         </label>
       </div>
+      <p class="spec-derived" id="cycleDerived"></p>
     </div>
 
     <div class="card" style="background:var(--surface-2);margin-bottom:14px">

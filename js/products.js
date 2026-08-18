@@ -1,112 +1,122 @@
 // Helfi Plastics — Продукти / артикули
-// Спецификации на опаковката (тава ИЛИ стек-чувал -> пале) +
-// самонадграждащ се калкулатор на производствения цикъл.
 //
-// Всеки артикул има ФИКСИРАН пакетаж: или е на тава, или е на стек/чувал
-// (не и двете). "Матрица" = бр. бутилки в тавата/чувала. Палето е или
-// фиксиран брой тави/чували (напр. течен сапун = 13, премиум 415 = 10),
-// или лимит по височина (мм) — тогава броят се смята автоматично.
+// Опаковка: всяка бутилка е ФИКСИРАНО или на тава, или в стек/чувал (не
+// и двете). "Бутилки в тавата/чувала" е бройката в самата опаковъчна
+// единица. Палето винаги е фиксиран брой тави/чували (напр. течен сапун
+// = 13, премиум 415 = 10) — без опция по височина.
 //
-// Как работи "самонадграждането":
-// При всеки нов запис (машина, дата, часове работа, произведени тави/
-// чували) скриптът НЕ пази стар фиксиран резултат — той преизчислява
-// цикъла наново от всички записи всеки път. Взима последните MIN_CONFIRM
-// записа и ако произведеният им темп (бут./час) съвпада в рамките на
-// TOLERANCE (%), приема стойността за "потвърдена". Иначе показва
-// текуща най-добра оценка (медиана) и продължава да събира данни.
-// Ако е зададен РЪЧЕН цикъл (сек/бутилка), той се ползва навсякъде
-// вместо изчисления — умният код продължава да калибрира на заден фон
-// за сравнение.
+// Цикъл на машината: "матрица" = броят кухини на формата, т.е. колко
+// бутилки излизат на всеки удар (обичайно 1 до 8). Времето за 1 удар
+// (сек) е времето между два удара. Пример: матрица 3 бутилки, удар на
+// 16 сек → за 32 сек (2 удара) се произвеждат 6 бутилки.
+//
+// Освен ръчно въведената матрица + удар, скриптът сам се самонадгражда:
+// от всеки нов запис (машина, дата, часове, произведени тави/чували)
+// пресмята темпа на производство и — щом последните няколко записа
+// съвпаднат в рамките на допустимо отклонение — го приема за "потвърден".
+// Ако е зададен ръчен цикъл, той се ползва навсякъде за сметките, а
+// умният код продължава да смята на заден фон, само за сравнение.
 
 (function () {
   const STORAGE_KEY = "helfi_products_v1";
   const TOLERANCE = 0.05; // 5% допустимо разминаване между последните записи
   const MIN_CONFIRM = 3;  // колко последователни записа трябва да съвпаднат
 
+  const CATEGORIES = {
+    household: "Битова химия и козметика",
+    water: "Бутилки за вода",
+    pharma: "Фармация",
+    food: "Хранителна промишленост",
+    supplements: "Хранителни добавки",
+    other: "Друго",
+  };
+
   // ---- начален каталог (от helfi.net/products/) ----
-  // По желание: [код, име, пакетаж('tray'|'stack'), тави/чували на пале]
+  // [код, име, категория, пакетаж('tray'|'stack'), тави/чували на пале]
+  // Категориите по-долу са ПЪРВОНАЧАЛНА преценка по името на продукта —
+  // провери ги и ги коригирай през падащото меню "Категория", ако нещо
+  // не съвпада с реалното разпределение на helfi.net/products/.
   const SEED_ARTICLES = [
-    ["H415-68", "415мл премиум", "tray", 10],
-    ["H100-74", "100мл спирт"],
-    ["H500-81", "500мл Веджи уош"],
-    ["H750-67", "750мл премиум"],
-    ["H120-75", "120мл флакон"],
-    ["H150-70", "150мл флакон"],
-    ["H200-71", "200мл флакон"],
-    ["H300-72", "300мл флакон"],
-    ["H400-69", "400мл течен сапун", "tray", 13],
-    ["H050-73", "50мл спирт"],
-    ["H500-76", "500мл 38мм"],
-    ["H750-80", "750мл пръскалка"],
-    ["H500-77", "Флакон вода за уста 500мл"],
-    ["H830-62", "830мл балсам"],
-    ["H125-61", "125мл фармация"],
-    ["H230-60", "230мл флакон"],
-    ["H330-44", "330мл фреш"],
-    ["H030-59", "30мл хотел"],
-    ["H300-56", "300мл кетчуп Оберон"],
-    ["H1000-55", "1 литър кетчуп"],
-    ["H500-54", "500мл кетчуп Оберон"],
-    ["H250-53", "250мл сос Денито"],
-    ["H1000-57", "1 литър олио HOSSO"],
-    ["H900-58", "900мл кетчуп Оберон"],
-    ["GAL19D", "19 литра галон с дръжка"],
-    ["H2000-47", "2000мл бъклица"],
-    ["H1000-46", "1000мл фреш"],
-    ["H750-41", "750мл шампоан"],
-    ["H700-48", "700мл кулинар"],
-    ["H500-45", "500мл фреш"],
-    ["H500-45B", "500мл фреш (бял)"],
-    ["H500-49", "500мл пръскалка"],
-    ["H500-40", "500мл веро"],
-    ["H300-43", "300мл фреш"],
-    ["H200-50", "200мл алкохол"],
-    ["GAL19", "19 литрови бутилки (галони)"],
-    ["H025-42", "25мл хотел"],
-    ["H250-22", "250мл фармация"],
-    ["H200-21", "200мл фармация"],
-    ["H150-12", "150мл фармация"],
-    ["H200-36", "200мл флакон"],
-    ["H150-31", "150мл флакон"],
-    ["H100-35", "100мл флакон"],
-    ["H200-23", "200мл Black Ram"],
-    ["H250-13", "250мл сос"],
-    ["H200-11", "200мл алкохол"],
-    ["H1000-26", "1000мл 42мм"],
-    ["H1000-29", "1000мл пръскалка"],
-    ["H750-25", "750мл пръскалка"],
-    ["H1000-20", "1000мл супер гел"],
-    ["H900-39", "900мл супер гел"],
-    ["H1000-19", "1000мл балсам"],
-    ["H900-38", "900мл балсам"],
-    ["H1000-18", "1000мл подови настилки"],
-    ["H500-37", "500мл веро"],
-    ["H900-34", "900мл AVA"],
-    ["H625-33", "625мл AVA"],
-    ["H425-32", "425мл AVA"],
-    ["H1000-28", "1000мл Планет"],
-    ["H625-30", "625мл Планет"],
-    ["H500-17", "500мл Планет"],
-    ["H425-27", "425мл Планет"],
-    ["H1000-16", "1000мл душ гел"],
-    ["H500-14", "500мл душ гел"],
-    ["H300-15", "300мл течен сапун"],
+    ["H415-68", "415мл премиум", "household", "tray", 10],
+    ["H100-74", "100мл спирт", "pharma"],
+    ["H500-81", "500мл Веджи уош", "food"],
+    ["H750-67", "750мл премиум", "household"],
+    ["H120-75", "120мл флакон", "pharma"],
+    ["H150-70", "150мл флакон", "pharma"],
+    ["H200-71", "200мл флакон", "pharma"],
+    ["H300-72", "300мл флакон", "pharma"],
+    ["H400-69", "400мл течен сапун", "household", "tray", 13],
+    ["H050-73", "50мл спирт", "pharma"],
+    ["H500-76", "500мл 38мм", "household"],
+    ["H750-80", "750мл пръскалка", "household"],
+    ["H500-77", "Флакон вода за уста 500мл", "pharma"],
+    ["H830-62", "830мл балсам", "household"],
+    ["H125-61", "125мл фармация", "pharma"],
+    ["H230-60", "230мл флакон", "pharma"],
+    ["H330-44", "330мл фреш", "food"],
+    ["H030-59", "30мл хотел", "household"],
+    ["H300-56", "300мл кетчуп Оберон", "food"],
+    ["H1000-55", "1 литър кетчуп", "food"],
+    ["H500-54", "500мл кетчуп Оберон", "food"],
+    ["H250-53", "250мл сос Денито", "food"],
+    ["H1000-57", "1 литър олио HOSSO", "food"],
+    ["H900-58", "900мл кетчуп Оберон", "food"],
+    ["GAL19D", "19 литра галон с дръжка", "water"],
+    ["H2000-47", "2000мл бъклица", "food"],
+    ["H1000-46", "1000мл фреш", "food"],
+    ["H750-41", "750мл шампоан", "household"],
+    ["H700-48", "700мл кулинар", "food"],
+    ["H500-45", "500мл фреш", "food"],
+    ["H500-45B", "500мл фреш (бял)", "food"],
+    ["H500-49", "500мл пръскалка", "household"],
+    ["H500-40", "500мл веро", "household"],
+    ["H300-43", "300мл фреш", "food"],
+    ["H200-50", "200мл алкохол", "pharma"],
+    ["GAL19", "19 литрови бутилки (галони)", "water"],
+    ["H025-42", "25мл хотел", "household"],
+    ["H250-22", "250мл фармация", "pharma"],
+    ["H200-21", "200мл фармация", "pharma"],
+    ["H150-12", "150мл фармация", "pharma"],
+    ["H200-36", "200мл флакон", "pharma"],
+    ["H150-31", "150мл флакон", "pharma"],
+    ["H100-35", "100мл флакон", "pharma"],
+    ["H200-23", "200мл Black Ram", "household"],
+    ["H250-13", "250мл сос", "food"],
+    ["H200-11", "200мл алкохол", "pharma"],
+    ["H1000-26", "1000мл 42мм", "household"],
+    ["H1000-29", "1000мл пръскалка", "household"],
+    ["H750-25", "750мл пръскалка", "household"],
+    ["H1000-20", "1000мл супер гел", "household"],
+    ["H900-39", "900мл супер гел", "household"],
+    ["H1000-19", "1000мл балсам", "household"],
+    ["H900-38", "900мл балсам", "household"],
+    ["H1000-18", "1000мл подови настилки", "household"],
+    ["H500-37", "500мл веро", "household"],
+    ["H900-34", "900мл AVA", "household"],
+    ["H625-33", "625мл AVA", "household"],
+    ["H425-32", "425мл AVA", "household"],
+    ["H1000-28", "1000мл Планет", "household"],
+    ["H625-30", "625мл Планет", "household"],
+    ["H500-17", "500мл Планет", "household"],
+    ["H425-27", "425мл Планет", "household"],
+    ["H1000-16", "1000мл душ гел", "household"],
+    ["H500-14", "500мл душ гел", "household"],
+    ["H300-15", "300мл течен сапун", "household"],
   ];
 
   // ---------------- state ----------------
-  function blankArticle(code, name, packagingUnit, unitsPerPallet) {
+  function blankArticle(code, name, category, packagingUnit, unitsPerPallet) {
     return {
       code,
       name,
+      category: category || "other",
       packagingUnit: packagingUnit || "tray", // 'tray' | 'stack'
-      bottlesPerUnit: null,                    // матрица: бр. бутилки в тавата/чувала
-      palletMode: unitsPerPallet ? "count" : "count", // 'count' | 'height'
-      unitsPerPallet: unitsPerPallet || null,  // фиксиран бр. тави/чували на пале
-      unitHeightMm: null,                      // височина на 1 тава/чувал (мм)
-      palletMaxHeightMm: null,                 // макс. височина на пале (мм)
+      bottlesPerUnit: unitsPerPallet ? null : null, // бр. бутилки в тавата/чувала
+      unitsPerPallet: unitsPerPallet || null,        // фиксиран бр. тави/чували на пале
       useManualCycle: false,
-      manualCycleSec: null,                    // ръчно зададени сек/бутилка
-      logs: [],                                // {id, machine, date, durationHours, units, ts}
+      matrixCavities: null,   // бр. кухини на формата = бутилки на удар (1-8)
+      strokeSeconds: null,    // време за 1 удар (сек)
+      logs: [],               // {id, machine, date, durationHours, units, ts}
     };
   }
 
@@ -115,18 +125,31 @@
   }
 
   function migrateArticle(old) {
-    // мигрира стар 3-нивов модел (тава -> стек -> пале) към новия 2-нивов
-    const a = blankArticle(old.code, old.name);
-    if (old.packagingUnit) {
-      // вече е в новия формат
-      return Object.assign(a, old);
-    }
-    a.bottlesPerUnit = old.bottlesPerTray ?? null;
-    a.packagingUnit = "tray";
-    if (old.traysPerStack && old.stacksPerPallet) {
-      a.palletMode = "count";
+    // мигрира по-стар формат (с packagingUnit, но без category/matrixCavides,
+    // евентуално с palletMode='height') към текущия модел
+    const a = blankArticle(old.code, old.name, old.category);
+    if (old.packagingUnit) a.packagingUnit = old.packagingUnit;
+    a.bottlesPerUnit = old.bottlesPerUnit ?? old.bottlesPerTray ?? null;
+
+    if (old.unitsPerPallet) {
+      a.unitsPerPallet = old.unitsPerPallet;
+    } else if (old.palletMode === "height" && old.unitHeightMm && old.palletMaxHeightMm) {
+      a.unitsPerPallet = Math.floor(old.palletMaxHeightMm / old.unitHeightMm);
+    } else if (old.traysPerStack && old.stacksPerPallet) {
       a.unitsPerPallet = old.traysPerStack * old.stacksPerPallet;
     }
+
+    a.useManualCycle = !!old.useManualCycle;
+    if (old.matrixCavities && old.strokeSeconds) {
+      a.matrixCavities = old.matrixCavities;
+      a.strokeSeconds = old.strokeSeconds;
+    } else if (old.manualCycleSec) {
+      // старият модел пазеше само сек/бутилка — пренасяме го еквивалентно
+      // с матрица 1, за да не се загуби зададената стойност
+      a.matrixCavities = 1;
+      a.strokeSeconds = old.manualCycleSec;
+    }
+
     a.logs = (old.logs || []).map((e) => ({
       id: e.id,
       machine: e.machine,
@@ -138,6 +161,10 @@
     return a;
   }
 
+  function needsMigration(a) {
+    return !("matrixCavities" in a) || !("category" in a) || "palletMode" in a;
+  }
+
   function loadState() {
     let state;
     try {
@@ -146,17 +173,19 @@
       state = emptyState();
     }
     if (!state.articles) state.articles = {};
-    // мигрираме съществуващи артикули от стария формат, ако е нужно
     Object.keys(state.articles).forEach((code) => {
       const a = state.articles[code];
-      if (!a.packagingUnit) {
+      if (needsMigration(a)) {
         state.articles[code] = migrateArticle(a);
       }
     });
     // добавяме липсващи артикули от каталога, без да пипаме вече въведени
-    SEED_ARTICLES.forEach(([code, name, packagingUnit, unitsPerPallet]) => {
+    SEED_ARTICLES.forEach(([code, name, category, packagingUnit, unitsPerPallet]) => {
       if (!state.articles[code]) {
-        state.articles[code] = blankArticle(code, name, packagingUnit, unitsPerPallet);
+        state.articles[code] = blankArticle(code, name, category, packagingUnit, unitsPerPallet);
+      } else if (!state.articles[code].category || state.articles[code].category === "other") {
+        // ако вече съществува, но няма категория — прилагаме тази от каталога
+        state.articles[code].category = category || "other";
       }
     });
     return state;
@@ -171,10 +200,9 @@
   let state = loadState();
   saveState();
   let selectedCode = null;
+  let activeCategory = "all";
 
   // ---------------- Firestore (по избор — синхронизация между устройства) ----------------
-  // Активира се сама, ако js/firebase-config.js съдържа истински ключове.
-  // Ако не е конфигурирано, всичко работи както преди — само в localStorage.
   const syncStatusEl = document.getElementById("syncStatus");
 
   function setSyncStatus(mode) {
@@ -209,13 +237,18 @@
         (snap) => {
           setSyncStatus("synced");
           if (!snap.exists) {
-            pushToFirestore(); // пръв път — качваме локалните данни в облака
+            pushToFirestore();
             return;
           }
           const remote = snap.data();
           if (remote && remote.json) {
             state = JSON.parse(remote.json);
-            localStorage.setItem(STORAGE_KEY, remote.json);
+            Object.keys(state.articles).forEach((code) => {
+              if (needsMigration(state.articles[code])) {
+                state.articles[code] = migrateArticle(state.articles[code]);
+              }
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
             renderList();
             if (selectedCode && state.articles[selectedCode]) renderDetail();
           }
@@ -253,18 +286,8 @@
     return plural ? "стекове/чували" : "стек/чувал";
   }
 
-  function unitsPerPalletOf(a) {
-    if (a.palletMode === "height") {
-      if (a.unitHeightMm > 0 && a.palletMaxHeightMm > 0) {
-        return Math.floor(a.palletMaxHeightMm / a.unitHeightMm);
-      }
-      return null;
-    }
-    return a.unitsPerPallet || null;
-  }
-
   function specComplete(a) {
-    return !!(a.bottlesPerUnit && unitsPerPalletOf(a));
+    return !!(a.bottlesPerUnit && a.unitsPerPallet);
   }
 
   function computeEntryRate(entry, article) {
@@ -309,15 +332,47 @@
     return { count: rates.length, confirmed, value, unit, spread };
   }
 
-  // effective rate = ръчният цикъл (ако е включен) ИЛИ умно изчисленият
+  // ефективен темп = ръчна матрица+удар (ако е включено) ИЛИ умно изчисленото
   function effectiveRate(article, stats) {
-    if (article.useManualCycle && article.manualCycleSec > 0 && article.bottlesPerUnit) {
-      return { value: 3600 / article.manualCycleSec, unit: "бутилки/час", source: "manual" };
+    if (article.useManualCycle && article.matrixCavities > 0 && article.strokeSeconds > 0) {
+      return {
+        value: (article.matrixCavities * 3600) / article.strokeSeconds,
+        unit: "бутилки/час",
+        source: "manual",
+      };
     }
     if (stats.count > 0) {
       return { value: stats.value, unit: stats.unit, source: "smart" };
     }
     return null;
+  }
+
+  // ---------------- rendering: category tabs ----------------
+  const catTabsEl = document.getElementById("catTabs");
+
+  function renderCatTabs() {
+    const codes = Object.keys(state.articles);
+    const counts = { all: codes.length };
+    Object.keys(CATEGORIES).forEach((k) => (counts[k] = 0));
+    codes.forEach((c) => {
+      const cat = state.articles[c].category || "other";
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+
+    const tabs = [["all", "Всички"]].concat(Object.entries(CATEGORIES));
+    catTabsEl.innerHTML = tabs
+      .map(([key, label]) => {
+        const n = counts[key] || 0;
+        if (key !== "all" && n === 0) return "";
+        return `<button class="cat-tab${key === activeCategory ? " active" : ""}" data-cat="${key}">${label} (${n})</button>`;
+      })
+      .join("");
+    catTabsEl.querySelectorAll(".cat-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        activeCategory = btn.dataset.cat;
+        renderList();
+      });
+    });
   }
 
   // ---------------- rendering: article list ----------------
@@ -332,11 +387,13 @@
   }
 
   function renderList() {
+    renderCatTabs();
     const q = (searchEl.value || "").trim().toLowerCase();
     const codes = Object.keys(state.articles).sort((a, b) => a.localeCompare(b));
     listEl.innerHTML = "";
     codes.forEach((code) => {
       const a = state.articles[code];
+      if (activeCategory !== "all" && (a.category || "other") !== activeCategory) return;
       if (q && !(a.code.toLowerCase().includes(q) || a.name.toLowerCase().includes(q))) return;
       const row = document.createElement("div");
       row.className = "article-row" + (code === selectedCode ? " selected" : "");
@@ -358,19 +415,16 @@
   const dCode = document.getElementById("dCode");
   const dName = document.getElementById("dName");
 
+  const specCategory = document.getElementById("specCategory");
   const specUnit = document.getElementById("specUnit");
   const specBottles = document.getElementById("specBottles");
-  const specPalletMode = document.getElementById("specPalletMode");
   const specUnitsPerPallet = document.getElementById("specUnitsPerPallet");
-  const specUnitHeight = document.getElementById("specUnitHeight");
-  const specPalletMaxHeight = document.getElementById("specPalletMaxHeight");
-  const fieldUnitsPerPallet = document.getElementById("fieldUnitsPerPallet");
-  const fieldUnitHeight = document.getElementById("fieldUnitHeight");
-  const fieldPalletMaxHeight = document.getElementById("fieldPalletMaxHeight");
   const specDerived = document.getElementById("specDerived");
 
   const specUseManualCycle = document.getElementById("specUseManualCycle");
-  const specManualCycle = document.getElementById("specManualCycle");
+  const specMatrixCavities = document.getElementById("specMatrixCavities");
+  const specStrokeSeconds = document.getElementById("specStrokeSeconds");
+  const cycleDerived = document.getElementById("cycleDerived");
 
   const statsBadge = document.getElementById("statsBadge");
   const statsBody = document.getElementById("statsBody");
@@ -387,13 +441,6 @@
     document.querySelectorAll(".unit-lbl-1cap").forEach((el) => (el.textContent = sing.charAt(0).toUpperCase() + sing.slice(1)));
     document.querySelectorAll(".unit-lbl-2").forEach((el) => (el.textContent = plur));
     logUnits.placeholder = plur.charAt(0).toUpperCase() + plur.slice(1);
-  }
-
-  function togglePalletFields(a) {
-    const byHeight = a.palletMode === "height";
-    fieldUnitsPerPallet.hidden = byHeight;
-    fieldUnitHeight.hidden = !byHeight;
-    fieldPalletMaxHeight.hidden = !byHeight;
   }
 
   function selectArticle(code) {
@@ -413,28 +460,30 @@
 
     updateUnitLabels(a);
 
+    specCategory.value = a.category || "other";
     specUnit.value = a.packagingUnit;
     specBottles.value = a.bottlesPerUnit ?? "";
-    specPalletMode.value = a.palletMode;
     specUnitsPerPallet.value = a.unitsPerPallet ?? "";
-    specUnitHeight.value = a.unitHeightMm ?? "";
-    specPalletMaxHeight.value = a.palletMaxHeightMm ?? "";
-    togglePalletFields(a);
 
     specUseManualCycle.checked = !!a.useManualCycle;
-    specManualCycle.value = a.manualCycleSec ?? "";
-    specManualCycle.disabled = !a.useManualCycle;
+    specMatrixCavities.value = a.matrixCavities ?? "";
+    specStrokeSeconds.value = a.strokeSeconds ?? "";
+    specMatrixCavities.disabled = !a.useManualCycle;
+    specStrokeSeconds.disabled = !a.useManualCycle;
 
-    const unitsPP = unitsPerPalletOf(a);
     if (specComplete(a)) {
-      const bottlesPerPallet = a.bottlesPerUnit * unitsPP;
-      let txt = `= ${fmtNum(unitsPP, 0)} ${unitLabel(a, true)} на пале · ${fmtNum(bottlesPerPallet, 0)} бутилки на пале`;
-      if (a.palletMode === "height") {
-        txt += ` (при височина ${fmtNum(a.unitHeightMm, 0)} мм на ${unitLabel(a, false)} и лимит ${fmtNum(a.palletMaxHeightMm, 0)} мм)`;
-      }
-      specDerived.textContent = txt;
+      const bottlesPerPallet = a.bottlesPerUnit * a.unitsPerPallet;
+      specDerived.textContent = `= ${fmtNum(a.unitsPerPallet, 0)} ${unitLabel(a, true)} на пале · ${fmtNum(bottlesPerPallet, 0)} бутилки на пале`;
     } else {
-      specDerived.textContent = `Въведи матрицата (бутилки в ${unitLabel(a, false)}) и лимита на палето, за да видиш пълното пале.`;
+      specDerived.textContent = `Въведи бутилки в ${unitLabel(a, false)} и ${unitLabel(a, true)} на пале, за да видиш пълното пале.`;
+    }
+
+    if (a.matrixCavities > 0 && a.strokeSeconds > 0) {
+      const secPerBottle = a.strokeSeconds / a.matrixCavities;
+      const bottlesPerHour = (a.matrixCavities * 3600) / a.strokeSeconds;
+      cycleDerived.textContent = `= ${fmtNum(secPerBottle, 2)} сек/бутилка · ${fmtNum(bottlesPerHour, 0)} бутилки/час`;
+    } else {
+      cycleDerived.textContent = "";
     }
 
     // stats
@@ -446,7 +495,7 @@
       statsBody.innerHTML = `<p class="hint">Все още няма записи от производство за този артикул.</p>`;
     } else {
       if (eff.source === "manual") {
-        statsBadge.innerHTML = `<span class="badge confirmed">ръчно зададен</span>`;
+        statsBadge.innerHTML = `<span class="badge confirmed">ръчно зададен (матрица × удар)</span>`;
       } else if (stats.confirmed) {
         statsBadge.innerHTML = `<span class="badge confirmed">потвърден · последните ${MIN_CONFIRM} съвпадат</span>`;
       } else {
@@ -463,16 +512,16 @@
         rows.push(`<div class="stat-row"><span>Цикъл на бутилка</span><b>${fmtNum(cycleSec, 2)} сек</b></div>`);
         const timePerUnitH = a.bottlesPerUnit / eff.value;
         rows.push(`<div class="stat-row"><span>Време за 1 ${unitLabel(a, false)}</span><b>${fmtHM(timePerUnitH)}</b></div>`);
-        if (unitsPP) {
-          const timePerPalletH = (a.bottlesPerUnit * unitsPP) / eff.value;
+        if (a.unitsPerPallet) {
+          const timePerPalletH = (a.bottlesPerUnit * a.unitsPerPallet) / eff.value;
           rows.push(`<div class="stat-row highlight"><span>Време за 1 пале</span><b>${fmtHM(timePerPalletH)}</b></div>`);
         }
       } else {
         rows.push(`<div class="stat-row"><span>Време за 1 ${unitLabel(a, false)}</span><b>${fmtHM(1 / eff.value)}</b></div>`);
-        if (unitsPP) {
-          rows.push(`<div class="stat-row highlight"><span>Време за 1 пале</span><b>${fmtHM(unitsPP / eff.value)}</b></div>`);
+        if (a.unitsPerPallet) {
+          rows.push(`<div class="stat-row highlight"><span>Време за 1 пале</span><b>${fmtHM(a.unitsPerPallet / eff.value)}</b></div>`);
         }
-        rows.push(`<p class="hint">Въведи матрицата (бутилки в ${unitLabel(a, false)}), за да видиш и цикъла в секунди на бутилка.</p>`);
+        rows.push(`<p class="hint">Въведи бутилки в ${unitLabel(a, false)}, за да видиш и цикъла в секунди на бутилка.</p>`);
       }
 
       if (eff.source === "manual" && stats.count > 0) {
@@ -515,30 +564,25 @@
   function saveSpec() {
     const a = state.articles[selectedCode];
     if (!a) return;
+    a.category = specCategory.value;
     a.packagingUnit = specUnit.value === "stack" ? "stack" : "tray";
     a.bottlesPerUnit = specBottles.value ? Number(specBottles.value) : null;
-    a.palletMode = specPalletMode.value === "height" ? "height" : "count";
     a.unitsPerPallet = specUnitsPerPallet.value ? Number(specUnitsPerPallet.value) : null;
-    a.unitHeightMm = specUnitHeight.value ? Number(specUnitHeight.value) : null;
-    a.palletMaxHeightMm = specPalletMaxHeight.value ? Number(specPalletMaxHeight.value) : null;
     a.useManualCycle = !!specUseManualCycle.checked;
-    a.manualCycleSec = specManualCycle.value ? Number(specManualCycle.value) : null;
+    a.matrixCavities = specMatrixCavities.value ? Number(specMatrixCavities.value) : null;
+    a.strokeSeconds = specStrokeSeconds.value ? Number(specStrokeSeconds.value) : null;
     saveState();
     renderDetail();
     renderList();
   }
 
-  [specUnit, specBottles, specPalletMode, specUnitsPerPallet, specUnitHeight, specPalletMaxHeight, specUseManualCycle, specManualCycle].forEach((el) => {
+  [specCategory, specUnit, specBottles, specUnitsPerPallet, specUseManualCycle, specMatrixCavities, specStrokeSeconds].forEach((el) => {
     el.addEventListener("change", saveSpec);
   });
 
-  specPalletMode.addEventListener("change", () => {
-    const a = state.articles[selectedCode];
-    if (a) togglePalletFields({ palletMode: specPalletMode.value });
-  });
-
   specUseManualCycle.addEventListener("change", () => {
-    specManualCycle.disabled = !specUseManualCycle.checked;
+    specMatrixCavities.disabled = !specUseManualCycle.checked;
+    specStrokeSeconds.disabled = !specUseManualCycle.checked;
   });
 
   document.getElementById("addLogBtn").addEventListener("click", () => {
@@ -616,9 +660,8 @@
         if (!imported.articles) throw new Error("невалиден файл");
         if (!confirm("Това ще замени текущите данни в браузъра с тези от файла. Продължи?")) return;
         state = imported;
-        // мигрираме, ако файлът е от стар формат
         Object.keys(state.articles).forEach((code) => {
-          if (!state.articles[code].packagingUnit) {
+          if (needsMigration(state.articles[code])) {
             state.articles[code] = migrateArticle(state.articles[code]);
           }
         });
