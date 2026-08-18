@@ -11,29 +11,31 @@
 //    общо_време    = удари_нужни × време_на_удар
 
 (function () {
-  const STORAGE_KEY = "helfi_products_v1";
+  const core = window.HelfiCore;
 
-  function loadArticles() {
-    try {
-      const state = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      return (state && state.articles) || {};
-    } catch (e) {
-      return {};
-    }
-  }
+  let articles = core.loadArticles();
+  let articleCodes = Object.keys(articles).sort((a, b) => a.localeCompare(b));
 
-  const articles = loadArticles();
-  const articleCodes = Object.keys(articles).sort((a, b) => a.localeCompare(b));
-
-  function fmtNum(n, digits) {
-    if (n === null || n === undefined || isNaN(n)) return "—";
-    return n.toLocaleString("bg-BG", { maximumFractionDigits: digits ?? 0 });
-  }
+  const fmtNum = core.fmtNum;
 
   function unitLabelFor(article) {
     if (!article) return "тава";
     return article.packagingUnit === "stack" ? "стек/чувал" : "тава";
   }
+
+  // живо опресняване, ако данните в Продукти се сменят (друг таб / връщане на фокус)
+  function reloadArticles() {
+    articles = core.loadArticles();
+    articleCodes = Object.keys(articles).sort((a, b) => a.localeCompare(b));
+    renderMachineRows();
+    computeTrays();
+    timeArticleSelect.innerHTML = articleOptionsHtml(timeArticleSelect.value);
+    computeTime();
+  }
+  window.addEventListener("storage", (e) => {
+    if (e.key === core.STORAGE_KEY) reloadArticles();
+  });
+  window.addEventListener("focus", reloadArticles);
 
   // ---------------- режим табове ----------------
   const tabTrays = document.getElementById("tabTrays");
@@ -120,9 +122,13 @@
         row.articleCode = sel.value;
         const a = articles[sel.value];
         if (a) {
+          const cyc = core.effectiveCycle(a);
           row.bottlesPerTray = a.bottlesPerUnit || row.bottlesPerTray;
-          row.bottlesPerHit = a.matrixCavities || row.bottlesPerHit;
-          row.secPerHit = a.strokeSeconds || row.secPerHit;
+          row.unitsPerPallet = a.unitsPerPallet || null;
+          if (cyc && cyc.matrixCavities && cyc.strokeSeconds) {
+            row.bottlesPerHit = cyc.matrixCavities;
+            row.secPerHit = cyc.strokeSeconds;
+          }
         }
         renderMachineRows();
         computeTrays();
@@ -152,6 +158,7 @@
     }
 
     let totalTrays = 0;
+    let totalPallets = 0;
     let anyValid = false;
     const rows = [];
 
@@ -168,8 +175,14 @@
       const bottles = hits * row.bottlesPerHit;
       const trays = Math.ceil(bottles / row.bottlesPerTray);
       totalTrays += trays;
+      let palletsTxt = "";
+      if (row.unitsPerPallet) {
+        const pallets = Math.ceil(trays / row.unitsPerPallet);
+        totalPallets += pallets;
+        palletsTxt = ` · ${fmtNum(pallets)} палета`;
+      }
       rows.push(
-        `<div class="stat-row"><span>${label}</span><b>${fmtNum(trays)} ${unit === "стек/чувал" ? "стека" : "тави"} · ${fmtNum(bottles)} бутилки · ${fmtNum(hits)} удара</b></div>`
+        `<div class="stat-row"><span>${label}</span><b>${fmtNum(trays)} ${unit === "стек/чувал" ? "стека" : "тави"} · ${fmtNum(bottles)} бутилки · ${fmtNum(hits)} удара${palletsTxt}</b></div>`
       );
     });
 
@@ -179,6 +192,9 @@
     }
 
     rows.push(`<div class="stat-row highlight"><span>Общо тави/стекове (всички машини)</span><b>${fmtNum(totalTrays)}</b></div>`);
+    if (totalPallets > 0) {
+      rows.push(`<div class="stat-row highlight"><span>Общо палета (машини с известно тави/пале)</span><b>${fmtNum(totalPallets)}</b></div>`);
+    }
     traysResultsEl.innerHTML = rows.join("");
   }
 
@@ -198,8 +214,11 @@
     const a = articles[timeArticleSelect.value];
     if (a) {
       if (a.bottlesPerUnit) timeBottlesPerTray.value = a.bottlesPerUnit;
-      if (a.matrixCavities) timeBottlesPerHit.value = a.matrixCavities;
-      if (a.strokeSeconds) timeSecPerHit.value = a.strokeSeconds;
+      const cyc = core.effectiveCycle(a);
+      if (cyc && cyc.matrixCavities && cyc.strokeSeconds) {
+        timeBottlesPerHit.value = cyc.matrixCavities;
+        timeSecPerHit.value = cyc.strokeSeconds;
+      }
     }
     computeTime();
   });
@@ -235,11 +254,18 @@
       minute: "2-digit",
     });
 
+    let palletsRow = "";
+    if (a && a.unitsPerPallet) {
+      const pallets = Math.ceil(desiredTrays / a.unitsPerPallet);
+      palletsRow = `<div class="stat-row"><span>= палета</span><b>${fmtNum(pallets)}</b></div>`;
+    }
+
     timeResultsEl.innerHTML = `
       <div class="stat-row"><span>Нужни бутилки</span><b>${fmtNum(totalBottlesNeeded)}</b></div>
       <div class="stat-row"><span>Нужни удари</span><b>${fmtNum(hitsNeeded)}</b></div>
       <div class="stat-row highlight"><span>Общо време</span><b>${h} ч ${m} мин ${s} сек</b></div>
       <div class="stat-row"><span>За ${fmtNum(desiredTrays)} ${unit}, ако се стартира сега</span><b>готово ≈ ${completionStr}</b></div>
+      ${palletsRow}
     `;
   }
 

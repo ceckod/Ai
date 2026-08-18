@@ -21,6 +21,7 @@
   const STORAGE_KEY = "helfi_products_v1";
   const TOLERANCE = 0.05; // 5% допустимо разминаване между последните записи
   const MIN_CONFIRM = 3;  // колко последователни записа трябва да съвпаднат
+  const DEFAULT_FREEZE_THRESHOLD = 30; // подразб. брой засичания на цикъла за автоматично замразяване
 
   const CATEGORIES = {
     household: "Битова химия и козметика",
@@ -117,6 +118,14 @@
       matrixCavities: null,   // бр. кухини на формата = бутилки на удар (1-8)
       strokeSeconds: null,    // време за 1 удар (сек)
       logs: [],               // {id, machine, date, durationHours, units, ts}
+
+      // ---- самообучение и замразяване на цикъла (реални засичания в сек.) ----
+      cycleSamples: [],           // [{id, seconds, ts}]
+      freezeThreshold: DEFAULT_FREEZE_THRESHOLD,
+      frozen: false,
+      frozenCycleSeconds: null,
+      frozenAt: null,
+      unlockBaseline: 0,          // бр. засичания в момента на последното отключване
     };
   }
 
@@ -158,11 +167,38 @@
       units: e.units ?? e.trays,
       ts: e.ts,
     }));
+
+    a.cycleSamples = Array.isArray(old.cycleSamples) ? old.cycleSamples : [];
+    a.freezeThreshold = old.freezeThreshold || DEFAULT_FREEZE_THRESHOLD;
+    a.frozen = !!old.frozen;
+    a.frozenCycleSeconds = old.frozenCycleSeconds ?? null;
+    a.frozenAt = old.frozenAt ?? null;
+    a.unlockBaseline = old.unlockBaseline || 0;
     return a;
   }
 
   function needsMigration(a) {
-    return !("matrixCavities" in a) || !("category" in a) || "palletMode" in a;
+    return !("matrixCavities" in a) || !("category" in a) || "palletMode" in a || !("cycleSamples" in a);
+  }
+
+  // ---------------- самообучение / замразяване на цикъла ----------------
+  function freezeFromSamples(a) {
+    const n = Math.max(1, a.freezeThreshold || DEFAULT_FREEZE_THRESHOLD);
+    const last = a.cycleSamples.slice(-n);
+    if (last.length === 0) return false;
+    const avg = last.reduce((sum, s) => sum + s.seconds, 0) / last.length;
+    a.frozenCycleSeconds = avg;
+    a.frozen = true;
+    a.frozenAt = Date.now();
+    return true;
+  }
+
+  function maybeAutoFreeze(a) {
+    if (a.frozen) return;
+    const threshold = a.freezeThreshold || DEFAULT_FREEZE_THRESHOLD;
+    if (a.cycleSamples.length - (a.unlockBaseline || 0) >= threshold) {
+      freezeFromSamples(a);
+    }
   }
 
   function loadState() {
@@ -426,6 +462,15 @@
   const specStrokeSeconds = document.getElementById("specStrokeSeconds");
   const cycleDerived = document.getElementById("cycleDerived");
 
+  const cycleSampleInput = document.getElementById("cycleSampleInput");
+  const freezeThresholdInput = document.getElementById("freezeThresholdInput");
+  const addCycleSampleBtn = document.getElementById("addCycleSampleBtn");
+  const lockCycleBtn = document.getElementById("lockCycleBtn");
+  const unlockCycleBtn = document.getElementById("unlockCycleBtn");
+  const freezeBadge = document.getElementById("freezeBadge");
+  const freezeInfo = document.getElementById("freezeInfo");
+  const cycleSamplesList = document.getElementById("cycleSamplesList");
+
   const statsBadge = document.getElementById("statsBadge");
   const statsBody = document.getElementById("statsBody");
   const historyList = document.getElementById("historyList");
@@ -485,6 +530,8 @@
     } else {
       cycleDerived.textContent = "";
     }
+
+    renderCycleLearning(a);
 
     // stats
     const stats = computeStats(a);
@@ -560,6 +607,94 @@
       });
     }
   }
+
+  function renderCycleLearning(a) {
+    freezeThresholdInput.value = a.freezeThreshold || DEFAULT_FREEZE_THRESHOLD;
+    const count = a.cycleSamples.length;
+    const sinceUnlock = count - (a.unlockBaseline || 0);
+    const threshold = a.freezeThreshold || DEFAULT_FREEZE_THRESHOLD;
+
+    if (a.frozen) {
+      freezeBadge.innerHTML = `<span class="badge confirmed">Замразен / Потвърден цикъл</span>`;
+      const when = a.frozenAt ? new Date(a.frozenAt).toLocaleString("bg-BG") : "";
+      freezeInfo.textContent = `Референтен цикъл: ${fmtNum(a.frozenCycleSeconds, 2)} сек/удар (замразен ${when}, от ${count} засичания общо).`;
+    } else {
+      freezeBadge.innerHTML = `<span class="badge calibrating">калибриране · ${sinceUnlock}/${threshold}</span>`;
+      freezeInfo.textContent = count
+        ? `${count} засичания общо · остават ${Math.max(0, threshold - sinceUnlock)} до автоматично замразяване.`
+        : `Все още няма засичания на цикъла за този артикул.`;
+    }
+
+    lockCycleBtn.disabled = a.frozen || count === 0;
+    unlockCycleBtn.disabled = !a.frozen;
+
+    if (a.cycleSamples.length === 0) {
+      cycleSamplesList.innerHTML = `<p class="hint">Няма добавени засичания.</p>`;
+    } else {
+      const sorted = [...a.cycleSamples].sort((x, y) => y.ts - x.ts);
+      cycleSamplesList.innerHTML = sorted
+        .map(
+          (s) => `
+          <div class="history-row" data-id="${s.id}">
+            <div><b>${fmtNum(s.seconds, 2)} сек</b> <span class="hint">· ${new Date(s.ts).toLocaleString("bg-BG")}</span></div>
+            <button class="del-log-btn" data-id="${s.id}" title="Изтрий засичането">✕</button>
+          </div>`
+        )
+        .join("");
+      cycleSamplesList.querySelectorAll(".del-log-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          a.cycleSamples = a.cycleSamples.filter((s) => s.id !== btn.dataset.id);
+          saveState();
+          renderDetail();
+        });
+      });
+    }
+  }
+
+  addCycleSampleBtn.addEventListener("click", () => {
+    const a = state.articles[selectedCode];
+    if (!a) return;
+    const seconds = Number(cycleSampleInput.value);
+    if (!seconds || seconds <= 0) {
+      cycleSampleInput.focus();
+      return;
+    }
+    a.cycleSamples.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      seconds,
+      ts: Date.now(),
+    });
+    maybeAutoFreeze(a);
+    saveState();
+    cycleSampleInput.value = "";
+    renderDetail();
+  });
+
+  freezeThresholdInput.addEventListener("change", () => {
+    const a = state.articles[selectedCode];
+    if (!a) return;
+    a.freezeThreshold = Number(freezeThresholdInput.value) || DEFAULT_FREEZE_THRESHOLD;
+    maybeAutoFreeze(a);
+    saveState();
+    renderDetail();
+  });
+
+  lockCycleBtn.addEventListener("click", () => {
+    const a = state.articles[selectedCode];
+    if (!a || a.cycleSamples.length === 0) return;
+    freezeFromSamples(a);
+    saveState();
+    renderDetail();
+  });
+
+  unlockCycleBtn.addEventListener("click", () => {
+    const a = state.articles[selectedCode];
+    if (!a) return;
+    a.frozen = false;
+    a.unlockBaseline = a.cycleSamples.length;
+    saveState();
+    renderDetail();
+  });
 
   function saveSpec() {
     const a = state.articles[selectedCode];

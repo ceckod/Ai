@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Helfi Plastics — Диспечер</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --bg: #0b1220;
+    --surface: #131c2e;
+    --surface-2: #1b2740;
+    --line: #263252;
+    --accent: #4fd1c5;
+    --amber: #ffb347;
+    --text: #e7ecef;
+    --text-dim: #8e9bb3;
+    --font-display: "Space Grotesk", sans-serif;
+    --font-body: "Inter", sans-serif;
+    --font-mono: "IBM Plex Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    padding: 20px 16px 60px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  header.page {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  h1 { font-family: var(--font-display); font-size: 1.3rem; font-weight: 600; margin: 0; }
+  .sub { color: var(--text-dim); font-size: 0.85rem; margin: 4px 0 0; }
+  .navlinks { display: flex; gap: 8px; flex-wrap: wrap; }
+  .navlink {
+    color: var(--text-dim); font-size: 0.85rem; text-decoration: none;
+    border: 1px solid var(--line); padding: 8px 14px; border-radius: 10px;
+  }
+  .navlink:hover { border-color: var(--accent); color: var(--accent); }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px 18px; margin-bottom: 18px;
+  }
+  .card h3 { font-family: var(--font-display); font-size: 1rem; font-weight: 600; margin: 0 0 4px; }
+  .card-sub { color: var(--text-dim); font-size: 0.82rem; margin: 0 0 14px; }
+  .hint { color: var(--text-dim); font-size: 0.78rem; margin: 4px 0; }
+  select, .text-input, input[type="text"], input[type="number"], input[type="date"] {
+    background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 8px; padding: 9px 10px; font-family: var(--font-body); font-size: 0.85rem; width: 100%;
+  }
+  .btn {
+    background: var(--accent); color: #06201d; border: none; border-radius: 8px;
+    padding: 9px 20px; font-weight: 600; font-size: 0.85rem; cursor: pointer; font-family: var(--font-body);
+  }
+  .btn:hover { background: #6fe0d5; }
+  .ghost-btn {
+    background: transparent; border: 1px solid var(--line); color: var(--text-dim);
+    border-radius: 8px; padding: 8px 14px; font-size: 0.8rem; cursor: pointer; font-family: var(--font-body);
+  }
+  .ghost-btn:hover { border-color: #e05d5d; color: #e05d5d; }
+  .spec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .spec-grid label { font-size: 0.76rem; color: var(--text-dim); display: flex; flex-direction: column; gap: 6px; }
+  .machine-row { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: var(--surface-2); }
+  .machine-row-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
+  .machine-row-head input[type="text"] { max-width: 220px; }
+  .machine-remove { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 0.9rem; flex-shrink: 0; }
+  .machine-remove:hover { color: #e05d5d; }
+  .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 0.85rem; }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row span { color: var(--text-dim); }
+  .stat-row.highlight b { color: var(--accent); font-size: 0.95rem; }
+  .badge { font-family: var(--font-mono); font-size: 0.68rem; padding: 3px 9px; border-radius: 999px; font-weight: 600; background: rgba(79,209,197,0.15); color: var(--accent); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <div>
+      <h1>Дневен диспечер</h1>
+      <p class="sub">Кои машини работят и какво произвеждат — общо за смяната</p>
+    </div>
+    <div class="navlinks">
+      <a href="produkti.html" class="navlink">Продукти</a>
+      <a href="kalkulator.html" class="navlink">Калкулатор</a>
+      <a href="index.html" class="navlink">← Начало</a>
+    </div>
+  </header>
+
+  <div class="card">
+    <h3>Смяна</h3>
+    <p class="card-sub">По подразбиране е избрана текущата смяна (график 07:00–19:00 дневна / 19:00–07:00 нощна). Можеш да смениш датата/типа или да зададеш ръчно часове за извънреден случай.</p>
+    <div class="spec-grid">
+      <label>Дата (начало на смяната)
+        <input type="date" id="shiftDate" />
+      </label>
+      <label>Тип смяна
+        <select id="shiftType">
+          <option value="day">Дневна (07:00–19:00)</option>
+          <option value="night">Нощна (19:00–07:00)</option>
+          <option value="custom">Ръчно зададени часове</option>
+        </select>
+      </label>
+      <label id="customHoursWrap" hidden>Продължителност (часове)
+        <input type="number" id="customHours" min="0" step="0.5" value="12" />
+      </label>
+    </div>
+    <p class="hint" id="shiftInfo"></p>
+  </div>
+
+  <div class="card">
+    <h3>Машини <span class="badge" id="machineCount"></span></h3>
+    <div id="machineList"></div>
+    <button class="ghost-btn" id="addMachineBtn" style="margin-top:4px">+ Добави машина</button>
+  </div>
+
+  <div class="card">
+    <h3>Резултати за смяната</h3>
+    <div id="results"></div>
+  </div>
+</div>
+
+<script src="js/clock.js"></script>
+<script src="js/helfi-core.js"></script>
+<script src="js/dispecher.js"></script>
+<script src="js/agent.js"></script>
+</body>
+</html>

@@ -284,6 +284,7 @@
     <div class="navlinks">
       <span class="navlink" id="syncStatus" style="cursor:default">💾 локално</span>
       <a href="kalkulator.html" class="navlink">Калкулатор</a>
+      <a href="dispecher.html" class="navlink">Диспечер</a>
       <a href="smeni.html" class="navlink">Смени</a>
       <a href="index.html" class="navlink">← Начало</a>
     </div>
@@ -355,6 +356,26 @@
     </div>
 
     <div class="card" style="background:var(--surface-2);margin-bottom:14px">
+      <h3>Самообучение на цикъла <span id="freezeBadge"></span></h3>
+      <p class="card-sub">Всяко реално засичане на времето между удар 1 и 2 (в секунди) се пази тук. При достигане на зададения брой засичания цикълът се замразява автоматично като референтен — Калкулаторът и Диспечерът го ползват по подразбиране (освен ако не е сложен ръчен цикъл по-горе).</p>
+      <div class="spec-grid">
+        <label>Ново засичане (сек между удар 1 и 2)
+          <input type="number" id="cycleSampleInput" step="0.01" min="0" placeholder="напр. 15.8" />
+        </label>
+        <label>Праг за замразяване (бр. засичания)
+          <input type="number" id="freezeThresholdInput" min="1" step="1" />
+        </label>
+      </div>
+      <div class="search-controls" style="margin-top:10px">
+        <button id="addCycleSampleBtn" class="btn">+ Добави засичане</button>
+        <button id="lockCycleBtn" class="ghost-btn">🔒 Заключи сега</button>
+        <button id="unlockCycleBtn" class="ghost-btn">🔓 Отключи</button>
+      </div>
+      <p class="hint" id="freezeInfo"></p>
+      <div id="cycleSamplesList" class="history-list" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card" style="background:var(--surface-2);margin-bottom:14px">
       <h3>Нов запис от производство</h3>
       <p class="card-sub">Въведи машина, дата, отработени часове и произведени <span class="unit-lbl-2">тави</span> — цикълът се преизчислява автоматично.</p>
       <div class="log-form">
@@ -404,5 +425,7 @@
 <script src="js/firebase-config.js"></script>
 <script src="js/clock.js"></script>
 <script src="js/products.js"></script>
+<script src="js/helfi-core.js"></script>
+<script src="js/agent.js"></script>
 </body>
 </html>
