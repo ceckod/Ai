@@ -9,9 +9,20 @@
 // записа и ако произведеният им темп (бут./час) съвпада в рамките на
 // TOLERANCE (%), приема стойността за "потвърдена". Иначе показва
 // текуща най-добра оценка (медиана) и продължава да събира данни.
+//
+// Достъп:
+// - Всеки, който отвори страницата, вижда data/products-state.json
+//   (публикуваните данни) READ-ONLY — не може да пипа нищо.
+// - Само влезлият с валиден GitHub token с права за запис в repo-то
+//   вижда формите за редакция. Всяка промяна прави commit директно
+//   към data/products-state.json през GitHub-ото REST API — без
+//   ръчно копиране на файлове.
 
 (function () {
-  const STORAGE_KEY = "helfi_products_v1";
+  const GH_API = "https://api.github.com";
+  const DATA_PATH = "data/products-state.json";
+  const CRED_KEY = "helfi_gh_creds_v1"; // { token, owner, repo, branch }
+
   const TOLERANCE = 0.05; // 5% допустимо разминаване между последните записи
   const MIN_CONFIRM = 3;  // колко последователни записа трябва да съвпаднат
 
@@ -84,103 +95,205 @@
     ["H300-15", "300мл течен сапун"],
   ];
 
-  // ---------------- state ----------------
-  function emptyState() {
-    return { articles: {} };
-  }
-
-  function loadState() {
-    let state;
-    try {
-      state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || emptyState();
-    } catch (e) {
-      state = emptyState();
-    }
-    if (!state.articles) state.articles = {};
-    // добавяме липсващи артикули от каталога, без да пипаме вече въведени
+  function seedArticlesObj() {
+    const obj = {};
     SEED_ARTICLES.forEach(([code, name]) => {
-      if (!state.articles[code]) {
-        state.articles[code] = {
-          code,
-          name,
-          bottlesPerTray: null,
-          traysPerStack: null,
-          stacksPerPallet: null,
-          logs: [],
-        };
-      }
+      obj[code] = { code, name, bottlesPerTray: null, traysPerStack: null, stacksPerPallet: null, logs: [] };
     });
-    return state;
+    return obj;
   }
 
-  function saveState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    pushToFirestore();
+  function withSeedFallback(articles) {
+    const seed = seedArticlesObj();
+    Object.keys(seed).forEach((code) => {
+      if (!articles[code]) articles[code] = seed[code];
+    });
+    return articles;
   }
 
-  let fsDocRef = null;
-  let state = loadState();
-  saveState();
+  function utf8ToBase64(str) {
+    return btoa(unescape(encodeURIComponent(str)));
+  }
+
+  // ---------------- GitHub вход/креденшъли ----------------
+  function ghCreds() {
+    try {
+      return JSON.parse(localStorage.getItem(CRED_KEY)) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function isLoggedIn() {
+    const c = ghCreds();
+    return !!(c && c.token && c.owner && c.repo);
+  }
+
+  function ghHeaders() {
+    const c = ghCreds();
+    return {
+      Authorization: `Bearer ${c.token}`,
+      Accept: "application/vnd.github+json",
+    };
+  }
+
+  async function validateLogin(token, owner, repo) {
+    const res = await fetch(`${GH_API}/repos/${owner}/${repo}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+    });
+    if (res.status === 404) throw new Error("Repo-то не е намерено (провери owner/repo) или токенът няма достъп.");
+    if (!res.ok) throw new Error(`GitHub грешка (${res.status})`);
+    const data = await res.json();
+    if (!data.permissions || !data.permissions.push) {
+      throw new Error("Токенът няма право за запис (push) в това repo.");
+    }
+    return data.default_branch || "main";
+  }
+
+  async function ghGetSha() {
+    const c = ghCreds();
+    const url = `${GH_API}/repos/${c.owner}/${c.repo}/contents/${DATA_PATH}?ref=${encodeURIComponent(c.branch)}`;
+    const res = await fetch(url, { headers: ghHeaders() });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`GitHub грешка при четене (${res.status})`);
+    const data = await res.json();
+    return data.sha;
+  }
+
+  async function commitToGitHub(message) {
+    if (!isLoggedIn()) return;
+    setCommitStatus("saving");
+    try {
+      const c = ghCreds();
+      let sha = await ghGetSha();
+      const body = {
+        message: message || "Обновяване на продукти",
+        content: utf8ToBase64(JSON.stringify(state, null, 2)),
+        branch: c.branch,
+      };
+      if (sha) body.sha = sha;
+
+      let res = await fetch(`${GH_API}/repos/${c.owner}/${c.repo}/contents/${DATA_PATH}`, {
+        method: "PUT",
+        headers: { ...ghHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (res.status === 409) {
+        // конфликт (файлът е сменен междувременно) — опресняваме sha и опитваме пак
+        sha = await ghGetSha();
+        body.sha = sha;
+        res = await fetch(`${GH_API}/repos/${c.owner}/${c.repo}/contents/${DATA_PATH}`, {
+          method: "PUT",
+          headers: { ...ghHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      }
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || `HTTP ${res.status}`);
+      }
+      setCommitStatus("saved");
+    } catch (e) {
+      setCommitStatus("error", e.message);
+    }
+  }
+
+  // ---------------- state ----------------
+  let state = { articles: seedArticlesObj() };
   let selectedCode = null;
 
-  // ---------------- Firestore (по избор — синхронизация между устройства) ----------------
-  // Активира се сама, ако js/firebase-config.js съдържа истински ключове.
-  // Ако не е конфигурирано, всичко работи както преди — само в localStorage.
-  const syncStatusEl = document.getElementById("syncStatus");
-
-  function setSyncStatus(mode) {
-    if (!syncStatusEl) return;
-    if (mode === "synced") {
-      syncStatusEl.textContent = "☁ синхронизирано";
-      syncStatusEl.style.color = "var(--accent)";
-      syncStatusEl.style.borderColor = "var(--accent)";
-    } else if (mode === "connecting") {
-      syncStatusEl.textContent = "☁ свързване…";
-      syncStatusEl.style.color = "var(--text-dim)";
-    } else if (mode === "error") {
-      syncStatusEl.textContent = "⚠ облакът не отговаря — работи се локално";
-      syncStatusEl.style.color = "var(--amber)";
-      syncStatusEl.style.borderColor = "var(--amber)";
-    } else {
-      syncStatusEl.textContent = "💾 локално";
-      syncStatusEl.style.color = "var(--text-dim)";
-      syncStatusEl.style.borderColor = "var(--line)";
-    }
-  }
-
-  function initFirestore() {
-    const cfg = window.HELFI_FIREBASE_CONFIG;
-    if (!cfg || !cfg.apiKey || typeof firebase === "undefined") return;
+  async function loadPublished() {
     try {
-      setSyncStatus("connecting");
-      firebase.initializeApp(cfg);
-      const db = firebase.firestore();
-      fsDocRef = db.collection("helfi_state").doc("products");
-      fsDocRef.onSnapshot(
-        (snap) => {
-          setSyncStatus("synced");
-          if (!snap.exists) {
-            pushToFirestore(); // пръв път — качваме локалните данни в облака
-            return;
-          }
-          const remote = snap.data();
-          if (remote && remote.json) {
-            state = JSON.parse(remote.json);
-            localStorage.setItem(STORAGE_KEY, remote.json);
-            renderList();
-            if (selectedCode && state.articles[selectedCode]) renderDetail();
-          }
-        },
-        () => setSyncStatus("error")
-      );
+      const res = await fetch("data/products-state.json", { cache: "no-store" });
+      if (!res.ok) throw new Error("no file");
+      const data = await res.json();
+      if (!data.articles) throw new Error("bad shape");
+      state = { articles: withSeedFallback(data.articles) };
     } catch (e) {
-      setSyncStatus("error");
+      state = { articles: seedArticlesObj() };
+    }
+    renderList();
+    if (selectedCode) renderDetail();
+  }
+
+  function saveState(commitMsg) {
+    if (!isLoggedIn()) return;
+    commitToGitHub(commitMsg);
+  }
+
+  // ---------------- UI: вход / изход ----------------
+  const loginCard = document.getElementById("loginCard");
+  const loginForm = document.getElementById("loginForm");
+  const loginError = document.getElementById("loginError");
+  const loginBtn = document.getElementById("loginBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const commitStatusEl = document.getElementById("commitStatus");
+  const whoamiEl = document.getElementById("whoami");
+
+  function setCommitStatus(mode, detail) {
+    if (!commitStatusEl) return;
+    if (mode === "saving") {
+      commitStatusEl.textContent = "⏳ запазва се в GitHub…";
+      commitStatusEl.style.color = "var(--text-dim)";
+    } else if (mode === "saved") {
+      commitStatusEl.textContent = "✓ запазено в GitHub";
+      commitStatusEl.style.color = "var(--accent)";
+    } else if (mode === "error") {
+      commitStatusEl.textContent = "⚠ грешка при запис" + (detail ? `: ${detail}` : "");
+      commitStatusEl.style.color = "var(--amber)";
+    } else {
+      commitStatusEl.textContent = "";
     }
   }
 
-  function pushToFirestore() {
-    if (!fsDocRef) return;
-    fsDocRef.set({ json: JSON.stringify(state), updatedAt: Date.now() }).catch(() => setSyncStatus("error"));
+  function applyLoginUI() {
+    const logged = isLoggedIn();
+    document.body.classList.toggle("edit-mode", logged);
+    if (loginCard) loginCard.hidden = logged;
+    if (logoutBtn) logoutBtn.hidden = !logged;
+    if (whoamiEl) {
+      const c = ghCreds();
+      whoamiEl.textContent = logged ? `${c.owner}/${c.repo}` : "";
+    }
+    [specBottles, specTrays, specStacks].forEach((el) => el && (el.disabled = !logged));
+    setCommitStatus(null);
+  }
+
+  if (loginForm) {
+    loginForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      loginError.textContent = "";
+      loginBtn.disabled = true;
+      loginBtn.textContent = "Проверка…";
+      const token = document.getElementById("ghToken").value.trim();
+      const owner = document.getElementById("ghOwner").value.trim();
+      const repo = document.getElementById("ghRepo").value.trim();
+      let branch = document.getElementById("ghBranch").value.trim();
+      try {
+        const defaultBranch = await validateLogin(token, owner, repo);
+        if (!branch) branch = defaultBranch;
+        localStorage.setItem(CRED_KEY, JSON.stringify({ token, owner, repo, branch }));
+        applyLoginUI();
+        renderList();
+        if (selectedCode) renderDetail();
+      } catch (e) {
+        loginError.textContent = e.message;
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = "Вход";
+      }
+    });
+  }
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      localStorage.removeItem(CRED_KEY);
+      applyLoginUI();
+      renderList();
+      if (selectedCode) renderDetail();
+    });
   }
 
   // ---------------- helpers ----------------
@@ -310,6 +423,7 @@
     specBottles.value = a.bottlesPerTray ?? "";
     specTrays.value = a.traysPerStack ?? "";
     specStacks.value = a.stacksPerPallet ?? "";
+    [specBottles, specTrays, specStacks].forEach((el) => (el.disabled = !isLoggedIn()));
 
     if (specComplete(a)) {
       const traysPerPallet = a.traysPerStack * a.stacksPerPallet;
@@ -317,7 +431,9 @@
       specDerived.textContent =
         `= ${fmtNum(traysPerPallet, 0)} тави на пале · ${fmtNum(bottlesPerPallet, 0)} бутилки на пале`;
     } else {
-      specDerived.textContent = "Въведи бутилки в тава, тави в стек и стекове на пале, за да видиш пълното пале.";
+      specDerived.textContent = isLoggedIn()
+        ? "Въведи бутилки в тава, тави в стек и стекове на пале, за да видиш пълното пале."
+        : "Опаковката за този артикул все още не е въведена.";
     }
 
     // stats
@@ -329,7 +445,6 @@
       if (stats.confirmed) {
         statsBadge.innerHTML = `<span class="badge confirmed">потвърден · последните ${MIN_CONFIRM} съвпадат</span>`;
       } else {
-        const need = MIN_CONFIRM - Math.min(stats.count, MIN_CONFIRM);
         const spreadTxt = stats.spread !== null ? ` (разлика ${fmtNum(stats.spread * 100, 0)}%)` : "";
         statsBadge.innerHTML = `<span class="badge calibrating">калибриране · ${stats.count} запис${stats.count === 1 ? "" : "а"}${spreadTxt}</span>`;
       }
@@ -371,36 +486,41 @@
         .map((e) => {
           const r = computeEntryRate(e, a);
           const rateTxt = r ? `${fmtNum(r.value, 0)} ${r.unit}` : "—";
+          const delBtn = isLoggedIn()
+            ? `<button class="del-log-btn" data-id="${e.id}" title="Изтрий записа">✕</button>`
+            : "";
           return `
             <div class="history-row" data-id="${e.id}">
               <div>
                 <b>${e.date || "—"}</b> · машина ${e.machine || "—"}<br/>
                 <span class="hint">${fmtNum(e.durationHours, 1)} ч · ${fmtNum(e.trays, 0)} тави → ${rateTxt}</span>
               </div>
-              <button class="del-log-btn" data-id="${e.id}" title="Изтрий записа">✕</button>
+              ${delBtn}
             </div>`;
         })
         .join("");
       historyList.querySelectorAll(".del-log-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
+          if (!isLoggedIn()) return;
           a.logs = a.logs.filter((e) => e.id !== btn.dataset.id);
-          saveState();
           renderDetail();
           renderList();
+          saveState(`Изтрит запис за ${a.code}`);
         });
       });
     }
   }
 
   function saveSpec() {
+    if (!isLoggedIn()) return;
     const a = state.articles[selectedCode];
     if (!a) return;
     a.bottlesPerTray = specBottles.value ? Number(specBottles.value) : null;
     a.traysPerStack = specTrays.value ? Number(specTrays.value) : null;
     a.stacksPerPallet = specStacks.value ? Number(specStacks.value) : null;
-    saveState();
     renderDetail();
     renderList();
+    saveState(`Опаковка: ${a.code}`);
   }
 
   [specBottles, specTrays, specStacks].forEach((el) => {
@@ -408,6 +528,7 @@
   });
 
   document.getElementById("addLogBtn").addEventListener("click", () => {
+    if (!isLoggedIn()) return;
     const a = state.articles[selectedCode];
     if (!a) return;
     const duration = Number(logDuration.value);
@@ -424,26 +545,28 @@
       trays,
       ts: Date.now(),
     });
-    saveState();
     if (logMachine.value.trim()) localStorage.setItem("helfi_last_machine", logMachine.value.trim());
     logDuration.value = "";
     logTrays.value = "";
     renderDetail();
     renderList();
+    saveState(`Нов запис: ${a.code}`);
   });
 
   document.getElementById("deleteArticleBtn").addEventListener("click", () => {
-    if (!selectedCode) return;
-    if (!confirm(`Да изтрия артикул ${selectedCode}? Всички записи ще се загубят.`)) return;
-    delete state.articles[selectedCode];
-    saveState();
+    if (!isLoggedIn() || !selectedCode) return;
+    if (!confirm(`Да изтрия артикул ${selectedCode}? Ще стане веднага в GitHub.`)) return;
+    const code = selectedCode;
+    delete state.articles[code];
     selectedCode = null;
     panel.hidden = true;
     renderList();
+    saveState(`Изтрит артикул: ${code}`);
   });
 
   // ---------------- add new article ----------------
   document.getElementById("addArticleBtn").addEventListener("click", () => {
+    if (!isLoggedIn()) return;
     const codeEl = document.getElementById("newCode");
     const nameEl = document.getElementById("newName");
     const code = codeEl.value.trim();
@@ -461,44 +584,22 @@
       stacksPerPallet: null,
       logs: [],
     };
-    saveState();
     codeEl.value = "";
     nameEl.value = "";
     renderList();
     selectArticle(code);
+    saveState(`Нов артикул: ${code}`);
   });
 
-  // ---------------- export / import ----------------
+  // ---------------- износ (резервно копие) ----------------
   document.getElementById("exportBtn").addEventListener("click", () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `helfi-produkti-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = "products-state.json";
     a.click();
     URL.revokeObjectURL(url);
-  });
-
-  document.getElementById("importFile").addEventListener("change", (ev) => {
-    const file = ev.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const imported = JSON.parse(reader.result);
-        if (!imported.articles) throw new Error("невалиден файл");
-        if (!confirm("Това ще замени текущите данни в браузъра с тези от файла. Продължи?")) return;
-        state = imported;
-        saveState();
-        selectedCode = null;
-        panel.hidden = true;
-        renderList();
-      } catch (e) {
-        alert("Файлът не е валиден JSON износ от тази страница.");
-      }
-    };
-    reader.readAsText(file);
-    ev.target.value = "";
   });
 
   // ---------------- init ----------------
@@ -506,6 +607,7 @@
   const lastMachine = localStorage.getItem("helfi_last_machine");
   if (lastMachine) logMachine.value = lastMachine;
 
+  applyLoginUI();
   renderList();
-  initFirestore();
+  loadPublished();
 })();
