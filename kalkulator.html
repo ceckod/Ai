@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Helfi Plastics — Калкулатор</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --bg: #0b1220;
+    --surface: #131c2e;
+    --surface-2: #1b2740;
+    --line: #263252;
+    --accent: #4fd1c5;
+    --amber: #ffb347;
+    --text: #e7ecef;
+    --text-dim: #8e9bb3;
+    --font-display: "Space Grotesk", sans-serif;
+    --font-body: "Inter", sans-serif;
+    --font-mono: "IBM Plex Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    padding: 20px 16px 60px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  header.page {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  .sub { color: var(--text-dim); font-size: 0.85rem; margin: 4px 0 0; }
+  .navlinks { display: flex; gap: 8px; flex-wrap: wrap; }
+  .navlink {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    text-decoration: none;
+    border: 1px solid var(--line);
+    padding: 8px 14px;
+    border-radius: 10px;
+  }
+  .navlink:hover { border-color: var(--accent); color: var(--accent); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+  }
+  .card h3 {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .card-sub { color: var(--text-dim); font-size: 0.82rem; margin: 0 0 14px; }
+  .hint { color: var(--text-dim); font-size: 0.78rem; margin: 4px 0; }
+
+  select, .text-input, input[type="text"], input[type="number"] {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    width: 100%;
+  }
+  .btn {
+    background: var(--accent);
+    color: #06201d;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 20px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+  .btn:hover { background: #6fe0d5; }
+  .ghost-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+  .ghost-btn:hover { border-color: #e05d5d; color: #e05d5d; }
+
+  .mode-tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .mode-tab {
+    flex: 1;
+    min-width: 200px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-body);
+    text-align: left;
+  }
+  .mode-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(79,209,197,0.08); }
+
+  .spec-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .spec-grid label {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .machine-row {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: var(--surface-2);
+  }
+  .machine-row-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .machine-row-head b { font-size: 0.82rem; }
+  .machine-remove {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .machine-remove:hover { color: #e05d5d; }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.85rem;
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row span { color: var(--text-dim); }
+  .stat-row.highlight b { color: var(--accent); font-size: 0.95rem; }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <div>
+      <h1>Калкулатор</h1>
+      <p class="sub">Тави за зададено време или време за зададен брой тави — по удари на машината</p>
+    </div>
+    <div class="navlinks">
+      <a href="produkti.html" class="navlink">Продукти</a>
+      <a href="index.html" class="navlink">← Начало</a>
+    </div>
+  </header>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tabTrays">Тави за зададено време</button>
+    <button class="mode-tab" id="tabTime">Време за зададен брой тави</button>
+  </div>
+
+  <!-- ================= РЕЖИМ А: тави за зададено време ================= -->
+  <div id="modeTrays">
+    <div class="card">
+      <h3>Общо време на работа</h3>
+      <p class="card-sub">Важи за всички машини по-долу.</p>
+      <div class="spec-grid">
+        <label>Часове
+          <input type="number" id="totalHours" min="0" step="1" placeholder="напр. 12" />
+        </label>
+        <label>Минути
+          <input type="number" id="totalMinutes" min="0" max="59" step="1" placeholder="напр. 0" />
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Машини</h3>
+      <div id="machineList"></div>
+      <button class="ghost-btn" id="addMachineBtn" style="margin-top:4px">+ Добави машина</button>
+    </div>
+
+    <div class="card">
+      <h3>Резултати</h3>
+      <div id="traysResults"></div>
+    </div>
+  </div>
+
+  <!-- ================= РЕЖИМ Б: време за зададен брой тави ================= -->
+  <div id="modeTime" hidden>
+    <div class="card">
+      <h3>Машина и желан брой тави</h3>
+      <label style="font-size:0.76rem;color:var(--text-dim);display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+        Артикул (по избор — попълва данните автоматично)
+        <select id="timeArticleSelect"><option value="">— ръчно въвеждане —</option></select>
+      </label>
+      <div class="spec-grid">
+        <label>Бутилки в тава/чувал
+          <input type="number" id="timeBottlesPerTray" min="1" placeholder="напр. 400" />
+        </label>
+        <label>Бутилки на удар (матрица)
+          <input type="number" id="timeBottlesPerHit" min="1" placeholder="напр. 3" />
+        </label>
+        <label>Време за 1 удар (сек)
+          <input type="number" id="timeSecPerHit" min="0" step="0.01" placeholder="напр. 16" />
+        </label>
+        <label>Желани тави
+          <input type="number" id="timeDesiredTrays" min="1" placeholder="напр. 50" />
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Резултати</h3>
+      <div id="timeResults"></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/clock.js"></script>
+<script src="js/kalkulator.js"></script>
+</body>
+</html>
