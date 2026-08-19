@@ -9,6 +9,11 @@
   const SHIFT_LEN_HOURS = 12;
 
   function loadArticles() {
+    // единствен източник на истина: HelfiData (виж js/data-store.js).
+    // За обикновен посетител това са публикуваните (централни) данни,
+    // READ ONLY. За отключен админ — неговата локална чернова.
+    if (global.HelfiData) return global.HelfiData.currentArticles();
+    // резервен вариант, ако data-store.js не е зареден на страницата
     try {
       const state = JSON.parse(localStorage.getItem(STORAGE_KEY));
       return (state && state.articles) || {};

@@ -1,10 +1,16 @@
 // Helfi Plastics — Дневен диспечер
 // Машина -> продукт за текущата/избраната смяна, изчислено с ефективния
 // (замразен/ръчен/умен) цикъл на артикула от Продукти.
+//
+// Това е САМО "какво ако" симулатор: избираш смяна, машини и артикул,
+// виждаш веднага какво би се произвело — но нищо от избора НЕ се запазва
+// никъде (нито локално, нито централно). Затвориш ли/презаредиш ли
+// страницата, стартираш начисто. Само артикулите (каталогът) идват от
+// централните, публикувани от администратора данни.
 (function () {
   const core = window.HelfiCore;
-  let articles = core.loadArticles();
-  let articleCodes = Object.keys(articles).sort((a, b) => a.localeCompare(b));
+  let articles = {};
+  let articleCodes = [];
   const fmtNum = core.fmtNum;
 
   const shiftDateEl = document.getElementById("shiftDate");
@@ -55,17 +61,14 @@
     return `Ръчно зададена смяна · ${d} · ${fmtNum(shiftHours(), 1)} ч`;
   }
 
+  // смяната (дата/тип) влияе само на продължителността в часове, използвана
+  // за сметките — списъкът с машини нарочно НЕ се презарежда/пази по смяна,
+  // просто продължава като временна симулация в тази сесия
   function loadForShift() {
     currentShiftKey = shiftKey();
-    const saved = core.getDispatchForShift(currentShiftKey);
-    machines = saved.machines && saved.machines.length ? saved.machines : [{ id: newId(), name: "Машина 1", articleCode: "" }];
-    if (shiftTypeEl.value === "custom" && saved.hours) customHoursEl.value = saved.hours;
+    if (machines.length === 0) machines = [{ id: newId(), name: "Машина 1", articleCode: "" }];
     renderMachines();
     computeAll();
-  }
-
-  function persist() {
-    core.saveDispatchForShift(currentShiftKey, { hours: shiftHours(), machines });
   }
 
   function newId() {
@@ -92,7 +95,6 @@
         machines = machines.filter((m) => m.id !== btn.dataset.remove);
         renderMachines();
         computeAll();
-        persist();
       });
     });
     machineListEl.querySelectorAll("[data-field='name']").forEach((inp) => {
@@ -100,7 +102,6 @@
         const m = machines.find((x) => x.id === inp.dataset.id);
         m.name = inp.value;
         computeAll();
-        persist();
       });
     });
     machineListEl.querySelectorAll("[data-article-mount]").forEach((mountEl) => {
@@ -114,7 +115,6 @@
         onSelect: (code) => {
           m.articleCode = code || "";
           computeAll();
-          persist();
         },
       });
     });
@@ -174,7 +174,6 @@
     machines.push({ id: newId(), name: `Машина ${machines.length + 1}`, articleCode: "" });
     renderMachines();
     computeAll();
-    persist();
   });
 
   shiftDateEl.addEventListener("change", loadForShift);
@@ -182,28 +181,24 @@
     customHoursWrap.hidden = shiftTypeEl.value !== "custom";
     loadForShift();
   });
-  customHoursEl.addEventListener("input", () => {
-    computeAll();
-    persist();
-  });
+  customHoursEl.addEventListener("input", computeAll);
 
-  window.addEventListener("storage", (e) => {
-    if (e.key === core.STORAGE_KEY) {
-      articles = core.loadArticles();
-      articleCodes = Object.keys(articles).sort((a, b) => a.localeCompare(b));
-      renderMachines();
-      computeAll();
-    }
-  });
-  window.addEventListener("focus", () => {
+  function refreshArticles() {
     articles = core.loadArticles();
     articleCodes = Object.keys(articles).sort((a, b) => a.localeCompare(b));
     renderMachines();
     computeAll();
-  });
+  }
+  window.addEventListener("focus", refreshArticles);
 
   // ---------------- init ----------------
   initDefaults();
   customHoursWrap.hidden = shiftTypeEl.value !== "custom";
   loadForShift();
+
+  // артикулите (каталогът) идват асинхронно от централните публикувани
+  // данни — щом пристигнат, опресняваме падащите менюта
+  if (window.HelfiData) {
+    window.HelfiData.fetchCentral().then(refreshArticles);
+  }
 })();

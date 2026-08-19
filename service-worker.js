@@ -4,13 +4,15 @@
 // файловете се виждат веднага, вместо телефонът да "залепне" за стара
 // кеширана версия (напр. стар бъгав js/agent.js).
 
-const CACHE_NAME = "helfi-cache-v3";
+const CACHE_NAME = "helfi-cache-v4";
 const CORE_ASSETS = [
   "/",
   "/index.html",
   "/smeni.html",
   "/css/style.css",
   "/js/app.js",
+  "/js/data-store.js",
+  "/data/products-data.json",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png"

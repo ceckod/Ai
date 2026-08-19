@@ -279,7 +279,7 @@
 <div class="wrap">
   <header class="page">
     <div>
-      <h1>Продукти</h1>
+      <h1 id="pageTitle" style="cursor:default;user-select:none">Продукти</h1>
       <p class="sub">Опаковка (тава / стек / пале) и самонадграждащ се производствен цикъл</p>
     </div>
     <div class="navlinks">
@@ -290,6 +290,15 @@
       <a href="index.html" class="navlink">← Начало</a>
     </div>
   </header>
+
+  <div id="modeBar" class="card" style="padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+    <span id="modeLabel" class="hint" style="margin:0">Зареждане на данните…</span>
+    <div id="adminActions" class="search-controls" hidden>
+      <button id="publishBtn" class="btn">⬇ Изтегли за публикуване</button>
+      <button id="discardDraftBtn" class="ghost-btn">Отхвърли черновата</button>
+      <button id="lockAdminBtn" class="ghost-btn">Изход от админ</button>
+    </div>
+  </div>
 
   <div class="card">
     <h3>Избери артикул</h3>
@@ -305,7 +314,7 @@
         <span class="detail-code" id="dCode"></span>
         <h2 id="dName"></h2>
       </div>
-      <button id="deleteArticleBtn" class="ghost-btn">Изтрий артикул</button>
+      <button id="deleteArticleBtn" class="ghost-btn admin-only" hidden>Изтрий артикул</button>
     </div>
 
     <div class="card" style="background:var(--surface-2);margin-bottom:14px">
@@ -356,10 +365,10 @@
       <p class="hint">ASB-50MB (кухини → макс. обем): 1→2.5л · 2→1.5л · 3→0.6л · 4→0.25л · 5→0.1л · 6→0.03л</p>
     </div>
 
-    <div class="card" style="background:var(--surface-2);margin-bottom:14px">
+    <div id="cycleLearningCard" class="card" style="background:var(--surface-2);margin-bottom:14px">
       <h3>Самообучение на цикъла <span id="freezeBadge"></span></h3>
       <p class="card-sub">Всяко реално засичане на времето между удар 1 и 2 (в секунди) се пази тук. При достигане на зададения брой засичания цикълът се замразява автоматично като референтен — Калкулаторът и Диспечерът го ползват по подразбиране (освен ако не е сложен ръчен цикъл по-горе).</p>
-      <div class="spec-grid">
+      <div class="spec-grid admin-only" hidden>
         <label>Ново засичане (сек между удар 1 и 2)
           <input type="number" id="cycleSampleInput" step="0.01" min="0" placeholder="напр. 15.8" />
         </label>
@@ -367,7 +376,7 @@
           <input type="number" id="freezeThresholdInput" min="1" step="1" />
         </label>
       </div>
-      <div class="search-controls" style="margin-top:10px">
+      <div class="search-controls admin-only" hidden style="margin-top:10px">
         <button id="addCycleSampleBtn" class="btn">+ Добави засичане</button>
         <button id="lockCycleBtn" class="ghost-btn">🔒 Заключи сега</button>
         <button id="unlockCycleBtn" class="ghost-btn">🔓 Отключи</button>
@@ -376,7 +385,7 @@
       <div id="cycleSamplesList" class="history-list" style="margin-top:8px"></div>
     </div>
 
-    <div class="card" style="background:var(--surface-2);margin-bottom:14px">
+    <div class="card admin-only" hidden style="background:var(--surface-2);margin-bottom:14px">
       <h3>Нов запис от производство</h3>
       <p class="card-sub">Въведи машина, дата, отработени часове и произведени <span class="unit-lbl-2">тави</span> — цикълът се преизчислява автоматично.</p>
       <div class="log-form">
@@ -399,7 +408,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card admin-only" hidden>
     <h3>Добави нов артикул</h3>
     <div class="search-controls">
       <input type="text" id="newCode" class="text-input" placeholder="Код (напр. H500-99)" style="max-width:160px" />
@@ -408,11 +417,11 @@
     </div>
   </div>
 
-  <div class="card">
-    <h3>Резервно копие</h3>
-    <p class="card-sub">Данните се пазят локално в този браузър. Изтегли ги, ако искаш да ги пренесеш на друго устройство или да не ги загубиш.</p>
+  <div class="card admin-only" hidden>
+    <h3>Резервно копие на черновата</h3>
+    <p class="card-sub">Черновата се пази само в този браузър, докато не я публикуваш (виж лентата най-горе). Можеш и ръчно да изтеглиш/качиш JSON, ако местиш работата на друго устройство.</p>
     <div class="search-controls">
-      <button id="exportBtn" class="btn">Изтегли JSON</button>
+      <button id="exportBtn" class="btn">Изтегли JSON (чернова)</button>
       <label class="ghost-btn" style="cursor:pointer">
         Качи JSON
         <input type="file" id="importFile" accept="application/json" hidden />
@@ -426,8 +435,9 @@
 <script src="js/firebase-config.js"></script>
 <script src="js/clock.js"></script>
 <script src="js/sw-register.js"></script>
-<script src="js/products.js"></script>
+<script src="js/data-store.js"></script>
 <script src="js/helfi-core.js"></script>
+<script src="js/products.js"></script>
 <script src="js/agent.js"></script>
 </body>
 </html>

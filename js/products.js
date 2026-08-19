@@ -32,78 +32,6 @@
     other: "Друго",
   };
 
-  // ---- начален каталог (от helfi.net/products/) ----
-  // [код, име, категория, пакетаж('tray'|'stack'), тави/чували на пале]
-  // Категориите по-долу са ПЪРВОНАЧАЛНА преценка по името на продукта —
-  // провери ги и ги коригирай през падащото меню "Категория", ако нещо
-  // не съвпада с реалното разпределение на helfi.net/products/.
-  const SEED_ARTICLES = [
-    ["H415-68", "415мл премиум", "household", "tray", 10],
-    ["H100-74", "100мл спирт", "pharma"],
-    ["H500-81", "500мл Веджи уош", "food"],
-    ["H750-67", "750мл премиум", "household"],
-    ["H120-75", "120мл флакон", "pharma"],
-    ["H150-70", "150мл флакон", "pharma"],
-    ["H200-71", "200мл флакон", "pharma"],
-    ["H300-72", "300мл флакон", "pharma"],
-    ["H400-69", "400мл течен сапун", "household", "tray", 13],
-    ["H050-73", "50мл спирт", "pharma"],
-    ["H500-76", "500мл 38мм", "household"],
-    ["H750-80", "750мл пръскалка", "household"],
-    ["H500-77", "Флакон вода за уста 500мл", "pharma"],
-    ["H830-62", "830мл балсам", "household"],
-    ["H125-61", "125мл фармация", "pharma"],
-    ["H230-60", "230мл флакон", "pharma"],
-    ["H330-44", "330мл фреш", "food"],
-    ["H030-59", "30мл хотел", "household"],
-    ["H300-56", "300мл кетчуп Оберон", "food"],
-    ["H1000-55", "1 литър кетчуп", "food"],
-    ["H500-54", "500мл кетчуп Оберон", "food"],
-    ["H250-53", "250мл сос Денито", "food"],
-    ["H1000-57", "1 литър олио HOSSO", "food"],
-    ["H900-58", "900мл кетчуп Оберон", "food"],
-    ["GAL19D", "19 литра галон с дръжка", "water"],
-    ["H2000-47", "2000мл бъклица", "food"],
-    ["H1000-46", "1000мл фреш", "food"],
-    ["H750-41", "750мл шампоан", "household"],
-    ["H700-48", "700мл кулинар", "food"],
-    ["H500-45", "500мл фреш", "food"],
-    ["H500-45B", "500мл фреш (бял)", "food"],
-    ["H500-49", "500мл пръскалка", "household"],
-    ["H500-40", "500мл веро", "household"],
-    ["H300-43", "300мл фреш", "food"],
-    ["H200-50", "200мл алкохол", "pharma"],
-    ["GAL19", "19 литрови бутилки (галони)", "water"],
-    ["H025-42", "25мл хотел", "household"],
-    ["H250-22", "250мл фармация", "pharma"],
-    ["H200-21", "200мл фармация", "pharma"],
-    ["H150-12", "150мл фармация", "pharma"],
-    ["H200-36", "200мл флакон", "pharma"],
-    ["H150-31", "150мл флакон", "pharma"],
-    ["H100-35", "100мл флакон", "pharma"],
-    ["H200-23", "200мл Black Ram", "household"],
-    ["H250-13", "250мл сос", "food"],
-    ["H200-11", "200мл алкохол", "pharma"],
-    ["H1000-26", "1000мл 42мм", "household"],
-    ["H1000-29", "1000мл пръскалка", "household"],
-    ["H750-25", "750мл пръскалка", "household"],
-    ["H1000-20", "1000мл супер гел", "household"],
-    ["H900-39", "900мл супер гел", "household"],
-    ["H1000-19", "1000мл балсам", "household"],
-    ["H900-38", "900мл балсам", "household"],
-    ["H1000-18", "1000мл подови настилки", "household"],
-    ["H500-37", "500мл веро", "household"],
-    ["H900-34", "900мл AVA", "household"],
-    ["H625-33", "625мл AVA", "household"],
-    ["H425-32", "425мл AVA", "household"],
-    ["H1000-28", "1000мл Планет", "household"],
-    ["H625-30", "625мл Планет", "household"],
-    ["H500-17", "500мл Планет", "household"],
-    ["H425-27", "425мл Планет", "household"],
-    ["H1000-16", "1000мл душ гел", "household"],
-    ["H500-14", "500мл душ гел", "household"],
-    ["H300-15", "300мл течен сапун", "household"],
-  ];
 
   // ---------------- state ----------------
   function blankArticle(code, name, category, packagingUnit, unitsPerPallet) {
@@ -201,40 +129,38 @@
     }
   }
 
-  function loadState() {
-    let state;
-    try {
-      state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || emptyState();
-    } catch (e) {
-      state = emptyState();
-    }
-    if (!state.articles) state.articles = {};
-    Object.keys(state.articles).forEach((code) => {
-      const a = state.articles[code];
-      if (needsMigration(a)) {
-        state.articles[code] = migrateArticle(a);
-      }
+  // ---------------- данни: централни (публикувани) vs. чернова на админа ----------------
+  // Тази страница вече НЕ пази данните директно в localStorage под свой
+  // ключ. Единственият източник е js/data-store.js (HelfiData):
+  //   - обикновен посетител: чете публикуваните данни, READ ONLY, нищо
+  //     от тази страница не се записва никъде;
+  //   - отключен админ (виж скрития жест върху заглавието): работи върху
+  //     локална чернова на своето устройство и я публикува ръчно (изтегля
+  //     нов data/products-data.json и го качва в проекта — виж README).
+  const data = window.HelfiData;
+  let isAdmin = !!(data && data.isAdmin());
+
+  function normalizeArticles(articles) {
+    const out = {};
+    Object.keys(articles || {}).forEach((code) => {
+      out[code] = needsMigration(articles[code]) ? migrateArticle(articles[code]) : articles[code];
     });
-    // добавяме липсващи артикули от каталога, без да пипаме вече въведени
-    SEED_ARTICLES.forEach(([code, name, category, packagingUnit, unitsPerPallet]) => {
-      if (!state.articles[code]) {
-        state.articles[code] = blankArticle(code, name, category, packagingUnit, unitsPerPallet);
-      } else if (!state.articles[code].category || state.articles[code].category === "other") {
-        // ако вече съществува, но няма категория — прилагаме тази от каталога
-        state.articles[code].category = category || "other";
-      }
-    });
-    return state;
+    return out;
+  }
+
+  function buildState() {
+    const source = data ? data.currentArticles() : {};
+    return { articles: normalizeArticles(source) };
   }
 
   function saveState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (!isAdmin || !data) return; // read-only посетител: не пише никъде
+    data.saveDraft(state.articles);
     pushToFirestore();
   }
 
   let fsDocRef = null;
-  let state = loadState();
-  saveState();
+  let state = buildState();
   let selectedCode = null;
   let activeCategory = "all";
 
@@ -285,6 +211,7 @@
               }
             });
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            if (data && isAdmin) data.saveDraft(state.articles);
             renderList();
             if (selectedCode && state.articles[selectedCode]) renderDetail();
           }
@@ -525,8 +452,13 @@
     specUseManualCycle.checked = !!a.useManualCycle;
     specMatrixCavities.value = a.matrixCavities ?? "";
     specStrokeSeconds.value = a.strokeSeconds ?? "";
-    specMatrixCavities.disabled = !a.useManualCycle;
-    specStrokeSeconds.disabled = !a.useManualCycle;
+    specMatrixCavities.disabled = !isAdmin || !a.useManualCycle;
+    specStrokeSeconds.disabled = !isAdmin || !a.useManualCycle;
+
+    // read-only посетител: вижда спецификациите, но не може да ги пипа
+    [specCategory, specUnit, specBottles, specUnitsPerPallet, specUseManualCycle].forEach((el) => {
+      el.disabled = !isAdmin;
+    });
 
     if (specComplete(a)) {
       const bottlesPerPallet = a.bottlesPerUnit * a.unitsPerPallet;
@@ -630,6 +562,7 @@
         .join("");
       historyList.querySelectorAll(".del-log-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
+          if (!isAdmin) return;
           a.logs = a.logs.filter((e) => e.id !== btn.dataset.id);
           saveState();
           renderDetail();
@@ -674,6 +607,7 @@
         .join("");
       cycleSamplesList.querySelectorAll(".del-log-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
+          if (!isAdmin) return;
           a.cycleSamples = a.cycleSamples.filter((s) => s.id !== btn.dataset.id);
           saveState();
           renderDetail();
@@ -683,6 +617,7 @@
   }
 
   addCycleSampleBtn.addEventListener("click", () => {
+    if (!isAdmin) return;
     const a = state.articles[selectedCode];
     if (!a) return;
     const seconds = Number(cycleSampleInput.value);
@@ -702,6 +637,7 @@
   });
 
   freezeThresholdInput.addEventListener("change", () => {
+    if (!isAdmin) return;
     const a = state.articles[selectedCode];
     if (!a) return;
     a.freezeThreshold = Number(freezeThresholdInput.value) || DEFAULT_FREEZE_THRESHOLD;
@@ -711,6 +647,7 @@
   });
 
   lockCycleBtn.addEventListener("click", () => {
+    if (!isAdmin) return;
     const a = state.articles[selectedCode];
     if (!a || a.cycleSamples.length === 0) return;
     freezeFromSamples(a);
@@ -719,6 +656,7 @@
   });
 
   unlockCycleBtn.addEventListener("click", () => {
+    if (!isAdmin) return;
     const a = state.articles[selectedCode];
     if (!a) return;
     a.frozen = false;
@@ -728,6 +666,7 @@
   });
 
   function saveSpec() {
+    if (!isAdmin) return;
     const a = state.articles[selectedCode];
     if (!a) return;
     a.category = specCategory.value;
@@ -752,6 +691,7 @@
   });
 
   document.getElementById("addLogBtn").addEventListener("click", () => {
+    if (!isAdmin) return;
     const a = state.articles[selectedCode];
     if (!a) return;
     const duration = Number(logDuration.value);
@@ -777,6 +717,7 @@
   });
 
   document.getElementById("deleteArticleBtn").addEventListener("click", () => {
+    if (!isAdmin) return;
     if (!selectedCode) return;
     if (!confirm(`Да изтрия артикул ${selectedCode}? Всички записи ще се загубят.`)) return;
     delete state.articles[selectedCode];
@@ -788,6 +729,7 @@
 
   // ---------------- add new article ----------------
   document.getElementById("addArticleBtn").addEventListener("click", () => {
+    if (!isAdmin) return;
     const codeEl = document.getElementById("newCode");
     const nameEl = document.getElementById("newName");
     const code = codeEl.value.trim();
@@ -817,6 +759,7 @@
   });
 
   document.getElementById("importFile").addEventListener("change", (ev) => {
+    if (!isAdmin) return;
     const file = ev.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -824,13 +767,8 @@
       try {
         const imported = JSON.parse(reader.result);
         if (!imported.articles) throw new Error("невалиден файл");
-        if (!confirm("Това ще замени текущите данни в браузъра с тези от файла. Продължи?")) return;
-        state = imported;
-        Object.keys(state.articles).forEach((code) => {
-          if (needsMigration(state.articles[code])) {
-            state.articles[code] = migrateArticle(state.articles[code]);
-          }
-        });
+        if (!confirm("Това ще замени текущата чернова с данните от файла. Продължи?")) return;
+        state.articles = normalizeArticles(imported.articles);
         saveState();
         selectedCode = null;
         panel.hidden = true;
@@ -843,11 +781,110 @@
     ev.target.value = "";
   });
 
+  // ---------------- скрит админ режим: отключване / публикуване ----------------
+  const modeLabelEl = document.getElementById("modeLabel");
+  const adminActionsEl = document.getElementById("adminActions");
+  const pageTitleEl = document.getElementById("pageTitle");
+  const adminOnlyEls = () => document.querySelectorAll(".admin-only");
+
+  function applyAdminVisibility() {
+    adminOnlyEls().forEach((el) => (el.hidden = !isAdmin));
+    adminActionsEl.hidden = !isAdmin;
+    if (isAdmin) {
+      modeLabelEl.textContent = data && data.hasDraft()
+        ? "🔓 Админ режим · имаш незапазена чернова (публикувай я, за да влезе в централните данни)"
+        : "🔓 Админ режим · редакциите се пазят като чернова на това устройство";
+    } else {
+      modeLabelEl.textContent = "👁 Само за четене · данните се въвеждат от администратора";
+    }
+  }
+
+  function enterAdmin() {
+    isAdmin = true;
+    applyAdminVisibility();
+    state = buildState();
+    selectedCode = null;
+    panel.hidden = true;
+    renderList();
+  }
+
+  function tryUnlock() {
+    const pin = prompt("Админ ПИН:");
+    if (pin === null) return;
+    if (data && data.tryUnlockAdmin(pin)) {
+      enterAdmin();
+    } else {
+      alert("Грешен ПИН.");
+    }
+  }
+
+  // скрит жест: 5 бързи клика върху заглавието "Продукти"
+  let titleClicks = 0;
+  let titleClickTimer = null;
+  pageTitleEl.addEventListener("click", () => {
+    if (isAdmin) return; // вече отключено — жестът вече не е нужен
+    titleClicks++;
+    clearTimeout(titleClickTimer);
+    titleClickTimer = setTimeout(() => (titleClicks = 0), 1500);
+    if (titleClicks >= 5) {
+      titleClicks = 0;
+      tryUnlock();
+    }
+  });
+
+  // удобство за самия админ: отваряне на produkti.html#admin показва промпта директно
+  if (!isAdmin && location.hash === "#admin") tryUnlock();
+
+  document.getElementById("publishBtn").addEventListener("click", () => {
+    if (!isAdmin || !data) return;
+    data.exportPublishedFile(state.articles);
+    alert(
+      "Изтеглен е нов products-data.json.\n\n" +
+        "За да влезе в сила за всички посетители: качи този файл в проекта " +
+        "(замени data/products-data.json) — например през _upload/ zip " +
+        "потока, описан в README — и изчакай сайтът да се обнови."
+    );
+  });
+
+  document.getElementById("discardDraftBtn").addEventListener("click", () => {
+    if (!isAdmin || !data) return;
+    if (!confirm("Да изтрия локалната чернова и да презаредя публикуваните данни?")) return;
+    data.resetDraft();
+    state = buildState();
+    selectedCode = null;
+    panel.hidden = true;
+    renderList();
+    applyAdminVisibility();
+  });
+
+  document.getElementById("lockAdminBtn").addEventListener("click", () => {
+    if (!data) return;
+    if (data.hasDraft() && !confirm("Имаш незапазена чернова — сигурен ли си, че искаш да излезеш от админ режима? Черновата ще остане на това устройство и ще я видиш пак, ако се логнеш отново.")) return;
+    data.lockAdmin();
+    isAdmin = false;
+    state = buildState();
+    selectedCode = null;
+    panel.hidden = true;
+    renderList();
+    applyAdminVisibility();
+  });
+
   // ---------------- init ----------------
   logDate.value = new Date().toISOString().slice(0, 10);
   const lastMachine = localStorage.getItem("helfi_last_machine");
   if (lastMachine) logMachine.value = lastMachine;
 
-  renderList();
-  initFirestore();
+  function init() {
+    state = buildState();
+    applyAdminVisibility();
+    renderList();
+    if (isAdmin) initFirestore();
+  }
+
+  if (data) {
+    data.fetchCentral().then(init);
+  } else {
+    modeLabelEl.textContent = "⚠ данните не можаха да се заредят";
+    init();
+  }
 })();
