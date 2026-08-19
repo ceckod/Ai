@@ -214,6 +214,13 @@
         background: #1b2740; border: 1px solid #263252; border-radius: 8px;
         z-index: 10000; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
       }
+      /* когато полето е близо до долния край на екрана (напр. плаващия
+         помощник), списъкът се отваря НАГОРЕ вместо надолу, за да не
+         излиза извън видимата част на екрана */
+      .helfi-combo-list.helfi-combo-up {
+        top: auto; bottom: 100%; margin-top: 0; margin-bottom: 4px;
+      }
+      .helfi-combo-list[hidden] { display: none !important; }
       .helfi-combo-item {
         padding: 9px 10px; font-size: 0.82rem; color: #e7ecef; cursor: pointer;
         white-space: normal; word-break: break-word; border-bottom: 1px solid #263252;
@@ -238,7 +245,7 @@
       <input type="text" class="helfi-combo-input" autocomplete="off"
              value="${escapeHtml(currentLabel)}"
              placeholder="${escapeHtml(opts.placeholder || "Пиши код или име…")}" />
-      <div class="helfi-combo-list" hidden></div>
+      <div class="helfi-combo-list${opts.openUp ? " helfi-combo-up" : ""}" hidden></div>
     `;
     const input = container.querySelector(".helfi-combo-input");
     const list = container.querySelector(".helfi-combo-list");

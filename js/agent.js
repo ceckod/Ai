@@ -27,10 +27,15 @@
           position: fixed; right: 16px; bottom: 78px; z-index: 9998;
           width: min(340px, calc(100vw - 32px)); max-height: 70vh;
           background: #131c2e; border: 1px solid #263252; border-radius: 14px;
-          display: flex; flex-direction: column; overflow: hidden;
+          display: flex; flex-direction: column;
           box-shadow: 0 10px 30px rgba(0,0,0,0.5);
           font-family: "Inter", sans-serif; color: #e7ecef;
         }
+        /* КРИТИЧНО: без това правило "display: flex" по-горе печели над
+           вграденото [hidden]{display:none} на браузъра (еднаква тежест,
+           но правилото на страницата е с по-висок приоритет), затова
+           панелът никога реално не изчезва след клик на Х. */
+        .helfi-agent-panel[hidden] { display: none !important; }
         .helfi-agent-head {
           padding: 12px 14px; border-bottom: 1px solid #263252;
           display: flex; justify-content: space-between; align-items: center;
@@ -155,6 +160,7 @@
         articles,
         value: fallbackArticleCode,
         placeholder: "Пиши код или име (напр. 415 или премиум)…",
+        openUp: true,
         onSelect: (code) => {
           fallbackArticleCode = code || "";
         },
