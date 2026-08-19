@@ -184,57 +184,105 @@
     return `${h} ч ${m} мин`;
   }
 
-  // ---------------- търсещо поле за артикул (input + datalist) ----------------
-  // Заменя дълъг <select> с 1000 реда: пишеш "415" или "премиум" и списъкът
-  // сам се стеснява до съвпаденията (нативно филтриране на браузъра).
+  // ---------------- търсещо поле за артикул (истински dropdown, не нативен datalist) ----------------
+  // Нативният <input list=""> datalist на телефон понякога рендерира зле
+  // (хоризонтален скрол при дълъг текст). Затова тук е собствен, изцяло
+  // контролиран dropdown: изглежда като старото падащо меню, но филтрира
+  // докато пишеш, и скролва вертикално.
   function articleLabel(article) {
     return `${article.code} — ${article.name}`;
   }
 
-  // връща {optionsHtml, labelToCode} за подаден списък артикули
-  function articleDatalistData(articles) {
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  let comboStylesInjected = false;
+  function injectComboStyles() {
+    if (comboStylesInjected || document.getElementById("helfi-combo-style")) return;
+    comboStylesInjected = true;
+    const style = document.createElement("style");
+    style.id = "helfi-combo-style";
+    style.textContent = `
+      .helfi-combo { position: relative; width: 100%; display: block; }
+      .helfi-combo input {
+        width: 100%; box-sizing: border-box;
+      }
+      .helfi-combo-list {
+        position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px;
+        max-height: 240px; overflow-y: auto; overflow-x: hidden;
+        background: #1b2740; border: 1px solid #263252; border-radius: 8px;
+        z-index: 10000; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      }
+      .helfi-combo-item {
+        padding: 9px 10px; font-size: 0.82rem; color: #e7ecef; cursor: pointer;
+        white-space: normal; word-break: break-word; border-bottom: 1px solid #263252;
+      }
+      .helfi-combo-item:last-child { border-bottom: none; }
+      .helfi-combo-item:hover, .helfi-combo-item.active { background: rgba(79,209,197,0.15); }
+      .helfi-combo-empty { padding: 9px 10px; font-size: 0.8rem; color: #8e9bb3; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // вгражда търсещо поле в контейнера (елемент, обикновено <span>/<div>).
+  // opts: { articles, value(код по избор), placeholder, onSelect(code|null) }
+  function mountArticleCombo(container, opts) {
+    injectComboStyles();
+    const articles = opts.articles || {};
     const codes = Object.keys(articles).sort((a, b) => a.localeCompare(b));
-    const labelToCode = {};
-    let optionsHtml = "";
-    codes.forEach((code) => {
-      const label = articleLabel(articles[code]);
-      labelToCode[label] = code;
-      const esc = label.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-      optionsHtml += `<option value="${esc}"></option>`;
+    const currentLabel = opts.value && articles[opts.value] ? articleLabel(articles[opts.value]) : "";
+
+    container.classList.add("helfi-combo");
+    container.innerHTML = `
+      <input type="text" class="helfi-combo-input" autocomplete="off"
+             value="${escapeHtml(currentLabel)}"
+             placeholder="${escapeHtml(opts.placeholder || "Пиши код или име…")}" />
+      <div class="helfi-combo-list" hidden></div>
+    `;
+    const input = container.querySelector(".helfi-combo-input");
+    const list = container.querySelector(".helfi-combo-list");
+
+    function renderMatches(filterText) {
+      const f = (filterText || "").trim().toLowerCase();
+      const matches = codes
+        .filter((code) => {
+          if (!f) return true;
+          const a = articles[code];
+          return a.code.toLowerCase().includes(f) || a.name.toLowerCase().includes(f);
+        })
+        .slice(0, 60);
+
+      if (matches.length === 0) {
+        list.innerHTML = `<div class="helfi-combo-empty">Няма съвпадения</div>`;
+      } else {
+        list.innerHTML = matches
+          .map((code) => `<div class="helfi-combo-item" data-code="${code}">${escapeHtml(articleLabel(articles[code]))}</div>`)
+          .join("");
+      }
+      list.hidden = false;
+    }
+
+    input.addEventListener("focus", () => renderMatches(""));
+    input.addEventListener("input", () => renderMatches(input.value));
+
+    input.addEventListener("blur", () => {
+      // забавяне, за да мине кликът върху елемент от списъка преди да се скрие
+      setTimeout(() => {
+        list.hidden = true;
+        if (input.value.trim() === "") opts.onSelect(null);
+      }, 180);
     });
-    return { optionsHtml, labelToCode };
-  }
 
-  // генерира HTML за <input list="..."> + <datalist> двойка
-  // value = текущо избран код (по избор), placeholder = текст, когато е празно
-  function articleComboHtml({ id, articles, value, placeholder }) {
-    const { optionsHtml, labelToCode } = articleDatalistData(articles);
-    const currentLabel = value && articles[value] ? articleLabel(articles[value]) : "";
-    const dlId = `dl-${id}`;
-    return {
-      labelToCode,
-      html: `
-        <input type="text" list="${dlId}" data-combo-input="${id}" value="${currentLabel}"
-               placeholder="${placeholder || "Пиши код или име…"}" autocomplete="off" />
-        <datalist id="${dlId}">${optionsHtml}</datalist>
-      `,
-    };
-  }
-
-  // закача change/input слушатели на вече вмъкнато combo поле.
-  // onSelect(code|null) се вика с кода на артикула (или null при изчистено/непознато поле).
-  function bindArticleCombo(inputEl, labelToCode, onSelect) {
-    inputEl.addEventListener("change", () => {
-      const val = inputEl.value.trim();
-      if (val === "") {
-        onSelect(null);
-        return;
-      }
-      if (labelToCode[val]) {
-        onSelect(labelToCode[val]);
-      }
-      // ако текстът не съвпада точно с опция от списъка (все още се пише),
-      // не пипаме избора — изчаква да избере от списъка или да изчисти полето
+    // mousedown вместо click, за да изпревари blur-а на инпута
+    list.addEventListener("mousedown", (e) => {
+      const item = e.target.closest(".helfi-combo-item");
+      if (!item) return;
+      e.preventDefault();
+      const code = item.dataset.code;
+      input.value = articleLabel(articles[code]);
+      list.hidden = true;
+      opts.onSelect(code);
     });
   }
 
@@ -255,8 +303,6 @@
     fmtNum,
     fmtHM,
     articleLabel,
-    articleDatalistData,
-    articleComboHtml,
-    bindArticleCombo,
+    mountArticleCombo,
   };
 })(window);

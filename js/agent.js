@@ -151,16 +151,13 @@
         machines.map((m) => `<option value="${m.id}">${m.name}</option>`).join("");
 
       const articles = core.loadArticles();
-      const combo = core.articleComboHtml({
-        id: "agent-article",
+      core.mountArticleCombo(articleWrap, {
         articles,
         value: fallbackArticleCode,
         placeholder: "Пиши код или име (напр. 415 или премиум)…",
-      });
-      articleWrap.innerHTML = combo.html;
-      const inp = articleWrap.querySelector("[data-combo-input]");
-      core.bindArticleCombo(inp, combo.labelToCode, (code) => {
-        fallbackArticleCode = code || "";
+        onSelect: (code) => {
+          fallbackArticleCode = code || "";
+        },
       });
     }
 

@@ -73,15 +73,8 @@
 
   function renderMachineRows() {
     machineListEl.innerHTML = machineRows
-      .map((row, idx) => {
-        const combo = core.articleComboHtml({
-          id: `m-${row.id}`,
-          articles,
-          value: row.articleCode,
-          placeholder: "Пиши код или име (напр. 415 или премиум)…",
-        });
-        row._labelToCode = combo.labelToCode;
-        return `
+      .map(
+        (row, idx) => `
       <div class="machine-row" data-id="${row.id}">
         <div class="machine-row-head">
           <b>Машина ${idx + 1}</b>
@@ -89,7 +82,7 @@
         </div>
         <label style="font-size:0.76rem;color:var(--text-dim);display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
           Артикул (по избор — попълва данните автоматично)
-          ${combo.html}
+          <span data-article-mount="${row.id}"></span>
         </label>
         <div class="spec-grid">
           <label>Бутилки в тава/чувал
@@ -102,8 +95,8 @@
             <input type="number" min="0" step="0.01" data-field="secPerHit" data-id="${row.id}" value="${row.secPerHit ?? ""}" placeholder="напр. 16" />
           </label>
         </div>
-      </div>`;
-      })
+      </div>`
+      )
       .join("");
 
     machineListEl.querySelectorAll("[data-remove]").forEach((btn) => {
@@ -114,24 +107,29 @@
       });
     });
 
-    machineListEl.querySelectorAll("[data-combo-input]").forEach((inp) => {
-      const rowId = inp.dataset.comboInput.replace(/^m-/, "");
+    machineListEl.querySelectorAll("[data-article-mount]").forEach((mountEl) => {
+      const rowId = mountEl.dataset.articleMount;
       const row = machineRows.find((r) => r.id === rowId);
       if (!row) return;
-      core.bindArticleCombo(inp, row._labelToCode, (code) => {
-        row.articleCode = code || "";
-        const a = code ? articles[code] : null;
-        if (a) {
-          const cyc = core.effectiveCycle(a);
-          row.bottlesPerTray = a.bottlesPerUnit || row.bottlesPerTray;
-          row.unitsPerPallet = a.unitsPerPallet || null;
-          if (cyc && cyc.matrixCavities && cyc.strokeSeconds) {
-            row.bottlesPerHit = cyc.matrixCavities;
-            row.secPerHit = cyc.strokeSeconds;
+      core.mountArticleCombo(mountEl, {
+        articles,
+        value: row.articleCode,
+        placeholder: "Пиши код или име (напр. 415 или премиум)…",
+        onSelect: (code) => {
+          row.articleCode = code || "";
+          const a = code ? articles[code] : null;
+          if (a) {
+            const cyc = core.effectiveCycle(a);
+            row.bottlesPerTray = a.bottlesPerUnit || row.bottlesPerTray;
+            row.unitsPerPallet = a.unitsPerPallet || null;
+            if (cyc && cyc.matrixCavities && cyc.strokeSeconds) {
+              row.bottlesPerHit = cyc.matrixCavities;
+              row.secPerHit = cyc.strokeSeconds;
+            }
           }
-        }
-        renderMachineRows();
-        computeTrays();
+          renderMachineRows();
+          computeTrays();
+        },
       });
     });
 
@@ -211,26 +209,23 @@
   let timeArticleCode = "";
 
   function renderTimeArticleCombo() {
-    const combo = core.articleComboHtml({
-      id: "time-article",
+    core.mountArticleCombo(timeArticleWrap, {
       articles,
       value: timeArticleCode,
       placeholder: "Пиши код или име (напр. 415 или премиум)…",
-    });
-    timeArticleWrap.innerHTML = combo.html;
-    const inp = timeArticleWrap.querySelector("[data-combo-input]");
-    core.bindArticleCombo(inp, combo.labelToCode, (code) => {
-      timeArticleCode = code || "";
-      const a = code ? articles[code] : null;
-      if (a) {
-        if (a.bottlesPerUnit) timeBottlesPerTray.value = a.bottlesPerUnit;
-        const cyc = core.effectiveCycle(a);
-        if (cyc && cyc.matrixCavities && cyc.strokeSeconds) {
-          timeBottlesPerHit.value = cyc.matrixCavities;
-          timeSecPerHit.value = cyc.strokeSeconds;
+      onSelect: (code) => {
+        timeArticleCode = code || "";
+        const a = code ? articles[code] : null;
+        if (a) {
+          if (a.bottlesPerUnit) timeBottlesPerTray.value = a.bottlesPerUnit;
+          const cyc = core.effectiveCycle(a);
+          if (cyc && cyc.matrixCavities && cyc.strokeSeconds) {
+            timeBottlesPerHit.value = cyc.matrixCavities;
+            timeSecPerHit.value = cyc.strokeSeconds;
+          }
         }
-      }
-      computeTime();
+        computeTime();
+      },
     });
   }
   renderTimeArticleCombo();

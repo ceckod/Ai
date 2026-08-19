@@ -75,23 +75,16 @@
   function renderMachines() {
     machineCountEl.textContent = `${machines.length} машина${machines.length === 1 ? "" : "и"}`;
     machineListEl.innerHTML = machines
-      .map((m, idx) => {
-        const combo = core.articleComboHtml({
-          id: `d-${m.id}`,
-          articles,
-          value: m.articleCode,
-          placeholder: "Пиши код или име (напр. 415 или премиум)…",
-        });
-        m._labelToCode = combo.labelToCode;
-        return `
+      .map(
+        (m, idx) => `
       <div class="machine-row" data-id="${m.id}">
         <div class="machine-row-head">
           <input type="text" data-field="name" data-id="${m.id}" value="${m.name || ""}" placeholder="Машина ${idx + 1}" />
           ${machines.length > 1 ? `<button class="machine-remove" data-remove="${m.id}" title="Премахни">✕</button>` : ""}
         </div>
-        ${combo.html}
-      </div>`;
-      })
+        <span data-article-mount="${m.id}"></span>
+      </div>`
+      )
       .join("");
 
     machineListEl.querySelectorAll("[data-remove]").forEach((btn) => {
@@ -110,14 +103,19 @@
         persist();
       });
     });
-    machineListEl.querySelectorAll("[data-combo-input]").forEach((inp) => {
-      const machineId = inp.dataset.comboInput.replace(/^d-/, "");
+    machineListEl.querySelectorAll("[data-article-mount]").forEach((mountEl) => {
+      const machineId = mountEl.dataset.articleMount;
       const m = machines.find((x) => x.id === machineId);
       if (!m) return;
-      core.bindArticleCombo(inp, m._labelToCode, (code) => {
-        m.articleCode = code || "";
-        computeAll();
-        persist();
+      core.mountArticleCombo(mountEl, {
+        articles,
+        value: m.articleCode,
+        placeholder: "Пиши код или име (напр. 415 или премиум)…",
+        onSelect: (code) => {
+          m.articleCode = code || "";
+          computeAll();
+          persist();
+        },
       });
     });
   }
