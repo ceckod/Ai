@@ -199,7 +199,9 @@
         (snap) => {
           setSyncStatus("synced");
           if (!snap.exists) {
-            pushToFirestore();
+            // само админ може да "засее" облачния документ, ако още не
+            // съществува — обикновен посетител никога не пише в Firestore
+            if (isAdmin) pushToFirestore();
             return;
           }
           const remote = snap.data();
@@ -925,7 +927,11 @@
     state = buildState();
     applyAdminVisibility();
     renderList();
-    if (isAdmin) initFirestore();
+    // Firestore слушателят е нужен на ВСИЧКИ (не само на админа), за да
+    // виждат обикновените посетители промените на живо, без да презареждат
+    // страницата. Писането към облака (pushToFirestore) си остава само за
+    // отключен админ — виж saveState() по-горе.
+    initFirestore();
   }
 
   if (data) {
