@@ -698,6 +698,20 @@
     el.addEventListener("change", saveSpec);
   });
 
+  // изричен бутон "Запази" — покрива случаите, когато потребителят не е
+  // "излязъл" от последното поле (change не е гръмнал), и дава ясно, видимо
+  // потвърждение, че записът наистина е тръгнал към облака
+  const saveArticleBtn = document.getElementById("saveArticleBtn");
+  const saveConfirmEl = document.getElementById("saveConfirm");
+  saveArticleBtn.addEventListener("click", () => {
+    if (!isAdmin || !selectedCode) return;
+    saveSpec();
+    saveConfirmEl.textContent = fsDocRef ? "✅ Запазено и изпратено в облака" : "✅ Запазено локално";
+    setTimeout(() => {
+      if (saveConfirmEl.textContent.startsWith("✅")) saveConfirmEl.textContent = "";
+    }, 3000);
+  });
+
   specUseManualCycle.addEventListener("change", () => {
     specMatrixCavities.disabled = !specUseManualCycle.checked;
     specStrokeSeconds.disabled = !specUseManualCycle.checked;
