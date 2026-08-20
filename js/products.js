@@ -227,18 +227,20 @@
 
   function pushToFirestore() {
     if (!fsDocRef) {
-      alert("ДИАГНОСТИКА: fsDocRef липсва — Firebase изобщо не се е свързал в този момент.");
+      if (saveConfirmEl) saveConfirmEl.textContent = "⚠ ДИАГНОСТИКА: fsDocRef липсва — Firebase не се е свързал";
       return;
     }
     fsDocRef
       .set({ json: JSON.stringify(state), updatedAt: Date.now() })
       .then(() => {
-        // видимо потвърждение, че записът РЕАЛНО е минал (не само тръгнал)
-        console.log("Firestore запис успешен:", new Date().toISOString());
+        if (saveConfirmEl) {
+          saveConfirmEl.textContent = "✅ ПОТВЪРДЕНО от Firestore в " + new Date().toLocaleTimeString("bg-BG");
+        }
       })
       .catch((err) => {
         setSyncStatus("error");
-        alert("ДИАГНОСТИКА: записът към Firestore се провали.\n\nГрешка: " + (err && err.code ? err.code : "") + "\n" + (err && err.message ? err.message : String(err)));
+        const msg = "❌ ГРЕШКА (" + (err && err.code ? err.code : "?") + "): " + (err && err.message ? err.message : String(err));
+        if (saveConfirmEl) saveConfirmEl.textContent = msg;
       });
   }
 
