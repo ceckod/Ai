@@ -387,12 +387,12 @@
 
     <div class="card admin-only" hidden style="background:var(--surface-2);margin-bottom:14px">
       <h3>Нов запис от производство</h3>
-      <p class="card-sub">Въведи машина, дата, отработени часове и произведени <span class="unit-lbl-2">тави</span> — цикълът се преизчислява автоматично.</p>
+      <p class="card-sub">Среден добив за смяна: въведи произведени <span class="unit-lbl-2">тави</span> (напр. 34) — часовете по подразбиране са 12 (една смяна), но може да ги промениш. Цикълът се преизчислява автоматично.</p>
       <div class="log-form">
         <input type="text" id="logMachine" placeholder="Машина (напр. 3)" />
         <input type="date" id="logDate" />
-        <input type="number" id="logDuration" step="0.1" min="0" placeholder="Часове" />
-        <input type="number" id="logUnits" min="0" placeholder="Тави" />
+        <input type="number" id="logDuration" step="0.1" min="0" placeholder="Часове (по подр. 12)" />
+        <input type="number" id="logUnits" min="0" placeholder="Тави за смяната" />
         <button id="addLogBtn" class="btn">Добави запис</button>
       </div>
     </div>

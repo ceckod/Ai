@@ -1,6 +1,8 @@
-// Helfi Plastics — общ часовник (час, дата, година, ден от седмицата)
+// Helfi Plastics — общ часовник (час, дата, ден от седмицата)
 // Включва се с едно <script src="js/clock.js"></script> на всяка страница
-// (стара или нова) и сам се вгражда в менюто/хедъра на страницата.
+// и сам се вгражда като голяма, видима лента най-отгоре на страницата
+// (преди всичко останало в <body>). Responsive: смалява се на телефон,
+// но остава добре видим и там.
 (function () {
   const MONTHS = [
     "януари", "февруари", "март", "април", "май", "юни",
@@ -23,44 +25,31 @@
     const style = document.createElement("style");
     style.id = "helfi-clock-style";
     style.textContent = `
-      .helfi-clock {
-        display: inline-flex;
-        align-items: baseline;
-        gap: 10px;
+      .helfi-clock-bar {
+        width: 100%;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: clamp(8px, 2vw, 14px) 12px;
+        background: linear-gradient(180deg, #131c2e, #0e1626);
+        border-bottom: 1px solid #263252;
         font-family: "IBM Plex Mono", monospace;
-        font-size: 0.78rem;
-        color: #8e9bb3;
-        border: 1px solid #263252;
-        border-radius: 999px;
-        padding: 6px 14px;
-        background: #131c2e;
-        white-space: nowrap;
-        line-height: 1.3;
+        text-align: center;
       }
-      .helfi-clock .hc-time {
+      .helfi-clock-bar .hc-time {
         color: #4fd1c5;
-        font-weight: 600;
-        font-size: 0.88rem;
-        letter-spacing: 0.02em;
+        font-weight: 700;
+        font-size: clamp(1.6rem, 6vw, 2.6rem);
+        letter-spacing: 0.03em;
+        line-height: 1.1;
       }
-      .helfi-clock .hc-date {
-        color: #e7ecef;
-      }
-      .helfi-clock-fixed {
-        position: fixed;
-        top: 12px;
-        right: 14px;
-        z-index: 9999;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.35);
-      }
-      @media (max-width: 640px) {
-        .helfi-clock {
-          font-size: 0.66rem;
-          padding: 5px 10px;
-          gap: 6px;
-        }
-        .helfi-clock .hc-time { font-size: 0.74rem; }
-        .helfi-clock-fixed { top: 8px; right: 8px; }
+      .helfi-clock-bar .hc-date {
+        color: #c3cbdb;
+        font-size: clamp(0.72rem, 2.4vw, 0.95rem);
+        letter-spacing: 0.01em;
       }
     `;
     document.head.appendChild(style);
@@ -68,7 +57,7 @@
 
   function buildClockEl() {
     const el = document.createElement("div");
-    el.className = "helfi-clock";
+    el.className = "helfi-clock-bar";
     el.id = "helfi-clock";
     el.innerHTML = `<span class="hc-time"></span><span class="hc-date"></span>`;
     return el;
@@ -83,31 +72,11 @@
       `${capitalize(DAYS_FULL[now.getDay()])}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}г.`;
   }
 
-  function findHost() {
-    // Работи с всяко съществуващо меню/хедър в сайта (старо или ново),
-    // без да е нужна конкретна класова структура.
-    return (
-      document.querySelector(".site-header") ||
-      document.querySelector("header.page") ||
-      document.querySelector("header nav") ||
-      document.querySelector("header") ||
-      document.querySelector(".tabs")
-    );
-  }
-
   function mount() {
     if (document.getElementById("helfi-clock")) return; // вече вграден
     injectStyles();
     const el = buildClockEl();
-    const host = findHost();
-
-    if (host) {
-      host.appendChild(el);
-    } else {
-      el.classList.add("helfi-clock-fixed");
-      document.body.appendChild(el);
-    }
-
+    document.body.insertBefore(el, document.body.firstChild);
     update(el);
     setInterval(() => update(el), 1000);
   }

@@ -132,6 +132,14 @@ a {
   margin: 0 0 28px;
 }
 
+.hero > div > p:nth-of-type(2) {
+  color: var(--text);
+  font-size: clamp(1.3rem, 3vw, 1.7rem);
+  font-family: var(--font-display);
+  font-weight: 600;
+  max-width: 40ch;
+}
+
 .hero-actions {
   display: flex;
   gap: 12px;
@@ -271,6 +279,21 @@ a {
   color: var(--text-dim);
   font-size: 0.88rem;
   margin: 0;
+}
+
+/* ============================================
+   Помощник — вграден чат (index.html)
+   ============================================ */
+.assistant-embed {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 28px 56px;
+}
+
+@media (max-width: 760px) {
+  .assistant-embed {
+    padding: 0 20px 48px;
+  }
 }
 
 /* ============================================

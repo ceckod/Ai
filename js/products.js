@@ -710,7 +710,7 @@
     });
     saveState();
     if (logMachine.value.trim()) localStorage.setItem("helfi_last_machine", logMachine.value.trim());
-    logDuration.value = "";
+    logDuration.value = "12";
     logUnits.value = "";
     renderDetail();
     renderList();
@@ -871,6 +871,7 @@
 
   // ---------------- init ----------------
   logDate.value = new Date().toISOString().slice(0, 10);
+  logDuration.value = "12"; // стандартна смяна = 12ч, лесно се променя
   const lastMachine = localStorage.getItem("helfi_last_machine");
   if (lastMachine) logMachine.value = lastMachine;
 
