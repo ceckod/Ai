@@ -216,6 +216,7 @@
     computeAll();
   }
   window.addEventListener("focus", refreshArticles);
+  if (window.HelfiData && window.HelfiData.onCentralUpdate) window.HelfiData.onCentralUpdate(refreshArticles);
 
   // ---------------- init ----------------
   initDefaults();

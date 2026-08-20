@@ -36,6 +36,7 @@
     if (e.key === core.STORAGE_KEY) reloadArticles();
   });
   window.addEventListener("focus", reloadArticles);
+  if (window.HelfiData && window.HelfiData.onCentralUpdate) window.HelfiData.onCentralUpdate(reloadArticles);
 
   // ---------------- режим табове ----------------
   const tabTrays = document.getElementById("tabTrays");

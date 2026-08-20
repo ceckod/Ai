@@ -192,7 +192,7 @@
     if (!cfg || !cfg.apiKey || typeof firebase === "undefined") return;
     try {
       setSyncStatus("connecting");
-      firebase.initializeApp(cfg);
+      if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(cfg);
       const db = firebase.firestore();
       fsDocRef = db.collection("helfi_state").doc("products");
       fsDocRef.onSnapshot(
