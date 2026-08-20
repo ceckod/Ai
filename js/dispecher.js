@@ -50,15 +50,36 @@
     return `${shiftDateEl.value}-${shiftTypeEl.value}`;
   }
 
+  // ако избраната смяна е ТОЧНО текущата (реално сега тече) -> смятаме само
+  // оставащите секунди до края ѝ, а не целия ѝ 12-часов период.
+  // За минала/бъдеща смяна (друга дата) или ръчно зададени часове -> пълната
+  // продължителност, защото "оставащо време" няма смисъл там.
+  function secondsToUse() {
+    if (shiftTypeEl.value === "custom") return shiftHours() * 3600;
+    const now = new Date();
+    const liveInfo = core.getShiftInfo(now);
+    if (liveInfo.shiftKey === shiftKey()) return liveInfo.secondsRemaining;
+    return shiftHours() * 3600;
+  }
+
   function shiftLabel() {
     const d = shiftDateEl.value;
-    if (shiftTypeEl.value === "day") return `Дневна смяна · ${d} 07:00–19:00`;
-    if (shiftTypeEl.value === "night") {
+    let base;
+    if (shiftTypeEl.value === "day") base = `Дневна смяна · ${d} 07:00–19:00`;
+    else if (shiftTypeEl.value === "night") {
       const start = new Date(d + "T19:00:00");
       const end = new Date(start.getTime() + 12 * 3600 * 1000);
-      return `Нощна смяна · ${d} 19:00 → ${pad(end.getDate())}.${pad(end.getMonth() + 1)} 07:00`;
+      base = `Нощна смяна · ${d} 19:00 → ${pad(end.getDate())}.${pad(end.getMonth() + 1)} 07:00`;
+    } else base = `Ръчно зададена смяна · ${d} · ${fmtNum(shiftHours(), 1)} ч`;
+
+    if (shiftTypeEl.value !== "custom") {
+      const now = new Date();
+      const liveInfo = core.getShiftInfo(now);
+      if (liveInfo.shiftKey === shiftKey()) {
+        base += ` · остават ${core.fmtHM(liveInfo.secondsRemaining)} до края (${liveInfo.endLabel})`;
+      }
     }
-    return `Ръчно зададена смяна · ${d} · ${fmtNum(shiftHours(), 1)} ч`;
+    return base;
   }
 
   // смяната (дата/тип) влияе само на продължителността в часове, използвана
@@ -122,12 +143,16 @@
 
   function computeAll() {
     shiftInfoEl.textContent = shiftLabel();
-    const seconds = shiftHours() * 3600;
+    const seconds = secondsToUse();
     if (!seconds) {
-      resultsEl.innerHTML = `<p class="hint">Задай продължителност на смяната.</p>`;
+      resultsEl.innerHTML = `<p class="hint">Няма оставащо време за тази смяна.</p>`;
       return;
     }
 
+    // общо палета = сбор от ЦЕЛИТЕ палета на всяка машина; оставащите (непълни
+    // палети) тави не се сумират в палета между различни артикули, защото
+    // всеки може да има различен капацитет тави/пале — те си остават видими
+    // в "Общо тави" по-долу и на реда на всяка машина ("+ X тави")
     let totals = { hits: 0, bottles: 0, trays: 0, pallets: 0 };
     let anyHits = false, anyTrays = false, anyPallets = false;
     const rows = [];
@@ -149,11 +174,12 @@
       if (prod.trays !== null) { totals.trays += prod.trays; anyTrays = true; }
       if (prod.pallets !== null) { totals.pallets += prod.pallets; anyPallets = true; }
 
+      const trayWord = core.unitLabelFor(a, true);
       const parts = [];
       if (prod.hits !== null) parts.push(`${fmtNum(prod.hits)} удара`);
       parts.push(`${fmtNum(prod.bottles)} бутилки`);
-      if (prod.trays !== null) parts.push(`${fmtNum(prod.trays)} тави`);
-      if (prod.pallets !== null) parts.push(`${fmtNum(prod.pallets)} палета`);
+      if (prod.trays !== null) parts.push(`${fmtNum(prod.trays)} ${trayWord}`);
+      if (prod.pallets !== null) parts.push(core.fmtPalletsTrays(prod.pallets, prod.extraTrays, trayWord));
 
       const sourceTxt = { manual: "ръчен цикъл", frozen: "замразен цикъл", baseline: "зададен цикъл", smart: "изчислен темп" }[prod.source] || "";
       rows.push(
@@ -165,7 +191,7 @@
     rows.push(`<div class="stat-row highlight"><span>Общо произведени бутилки</span><b>${fmtNum(totals.bottles)}</b></div>`);
     if (anyHits) rows.push(`<div class="stat-row highlight"><span>Общо удари</span><b>${fmtNum(totals.hits)}</b></div>`);
     if (anyTrays) rows.push(`<div class="stat-row highlight"><span>Общо тави</span><b>${fmtNum(totals.trays)}</b></div>`);
-    if (anyPallets) rows.push(`<div class="stat-row highlight"><span>Общо палета</span><b>${fmtNum(totals.pallets)}</b></div>`);
+    if (anyPallets) rows.push(`<div class="stat-row highlight"><span>Общо цели палета</span><b>${fmtNum(totals.pallets)}</b></div>`);
 
     resultsEl.innerHTML = rows.join("");
   }
@@ -195,6 +221,15 @@
   initDefaults();
   customHoursWrap.hidden = shiftTypeEl.value !== "custom";
   loadForShift();
+
+  // докато е отворена текущата (реално течаща) смяна, опресняваме всяка
+  // минута, за да "оставащото време" и сметките вървят напред, а не да
+  // замръзват към момента на зареждане на страницата
+  setInterval(() => {
+    if (shiftTypeEl.value !== "custom" && core.getShiftInfo(new Date()).shiftKey === shiftKey()) {
+      computeAll();
+    }
+  }, 60 * 1000);
 
   // артикулите (каталогът) идват асинхронно от централните публикувани
   // данни — щом пристигнат, опресняваме падащите менюта

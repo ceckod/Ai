@@ -104,16 +104,28 @@
     const bottlesPerUnit = article.bottlesPerUnit || null;
     const unitsPerPallet = article.unitsPerPallet || null;
     const trays = bottlesPerUnit ? Math.ceil(bottles / bottlesPerUnit) : null;
-    const pallets = trays && unitsPerPallet ? Math.ceil(trays / unitsPerPallet) : null;
+    // пълни (цели) палета + оставащите тави, които НЕ запълват цяло пале —
+    // напр. 34 тави при 10 тави/пале = 3 цели палета + 4 тави, а не 4 палета
+    const pallets = trays && unitsPerPallet ? Math.floor(trays / unitsPerPallet) : null;
+    const extraTrays = trays && unitsPerPallet ? trays % unitsPerPallet : null;
 
     return {
       hits,
       bottles: Math.round(bottles),
       trays,
       pallets,
+      extraTrays,
       source: cyc.source,
       bottlesPerHour: cyc.bottlesPerHour,
     };
+  }
+
+  // "3 палета + 4 тави" / "3 палета" / "4 тави" — четим текст за пале+тави
+  function fmtPalletsTrays(pallets, extraTrays, trayWord) {
+    trayWord = trayWord || "тави";
+    if (pallets === null || pallets === undefined) return null;
+    if (!extraTrays) return `${fmtNum(pallets)} палета`;
+    return `${fmtNum(pallets)} палета + ${fmtNum(extraTrays)} ${trayWord}`;
   }
 
   function pad(n) {
@@ -316,6 +328,7 @@
     unitLabelFor,
     effectiveCycle,
     produceForSeconds,
+    fmtPalletsTrays,
     getShiftInfo,
     loadDispatch,
     saveDispatch,

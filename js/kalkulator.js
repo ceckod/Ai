@@ -175,9 +175,12 @@
       totalTrays += trays;
       let palletsTxt = "";
       if (row.unitsPerPallet) {
-        const pallets = Math.ceil(trays / row.unitsPerPallet);
+        // цели палета + оставащи тави (не закръгляй частичното пале нагоре)
+        const pallets = Math.floor(trays / row.unitsPerPallet);
+        const extraTrays = trays % row.unitsPerPallet;
         totalPallets += pallets;
-        palletsTxt = ` · ${fmtNum(pallets)} палета`;
+        const trayWord = unit === "стек/чувал" ? "стека" : "тави";
+        palletsTxt = ` · ${core.fmtPalletsTrays(pallets, extraTrays, trayWord)}`;
       }
       rows.push(
         `<div class="stat-row"><span>${label}</span><b>${fmtNum(trays)} ${unit === "стек/чувал" ? "стека" : "тави"} · ${fmtNum(bottles)} бутилки · ${fmtNum(hits)} удара${palletsTxt}</b></div>`
@@ -191,7 +194,7 @@
 
     rows.push(`<div class="stat-row highlight"><span>Общо тави/стекове (всички машини)</span><b>${fmtNum(totalTrays)}</b></div>`);
     if (totalPallets > 0) {
-      rows.push(`<div class="stat-row highlight"><span>Общо палета (машини с известно тави/пале)</span><b>${fmtNum(totalPallets)}</b></div>`);
+      rows.push(`<div class="stat-row highlight"><span>Общо цели палета (машини с известно тави/пале)</span><b>${fmtNum(totalPallets)}</b></div>`);
     }
     traysResultsEl.innerHTML = rows.join("");
   }
@@ -263,8 +266,10 @@
 
     let palletsRow = "";
     if (a && a.unitsPerPallet) {
-      const pallets = Math.ceil(desiredTrays / a.unitsPerPallet);
-      palletsRow = `<div class="stat-row"><span>= палета</span><b>${fmtNum(pallets)}</b></div>`;
+      // цели палета + оставащи тави (не закръгляй частичното пале нагоре)
+      const pallets = Math.floor(desiredTrays / a.unitsPerPallet);
+      const extraTrays = desiredTrays % a.unitsPerPallet;
+      palletsRow = `<div class="stat-row"><span>= палета</span><b>${core.fmtPalletsTrays(pallets, extraTrays, unit)}</b></div>`;
     }
 
     timeResultsEl.innerHTML = `
