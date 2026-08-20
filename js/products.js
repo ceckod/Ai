@@ -317,6 +317,18 @@
       };
     }
     if (stats.count > 0) {
+      if (article.matrixCavities > 0) {
+        // знаем матрицата (гнезда на удар) -> превръщаме "умния" темп в реален
+        // цикъл на удар, вместо да го показваме подвеждащо като "на бутилка"
+        const strokeSeconds = (article.matrixCavities * 3600) / stats.value;
+        return {
+          value: stats.value,
+          unit: stats.unit,
+          source: "smart",
+          matrixCavities: article.matrixCavities,
+          strokeSeconds,
+        };
+      }
       return { value: stats.value, unit: stats.unit, source: "smart" };
     }
     return null;
@@ -417,6 +429,7 @@
   const logDate = document.getElementById("logDate");
   const logDuration = document.getElementById("logDuration");
   const logUnits = document.getElementById("logUnits");
+  const quickTraysInput = document.getElementById("quickTraysInput");
 
   function updateUnitLabels(a) {
     const sing = unitLabel(a, false);
@@ -452,12 +465,12 @@
     specUseManualCycle.checked = !!a.useManualCycle;
     specMatrixCavities.value = a.matrixCavities ?? "";
     specStrokeSeconds.value = a.strokeSeconds ?? "";
-    specMatrixCavities.disabled = !isAdmin || !a.useManualCycle;
+    specMatrixCavities.disabled = !isAdmin; // независимо от ръчен режим — матрицата е физическо свойство на формата
     specStrokeSeconds.disabled = !isAdmin || !a.useManualCycle;
 
     // read-only посетител: вижда спецификациите, но не може да ги пипа
-    [specCategory, specUnit, specBottles, specUnitsPerPallet, specUseManualCycle].forEach((el) => {
-      el.disabled = !isAdmin;
+    [specCategory, specUnit, specBottles, specUnitsPerPallet, specMatrixCavities, specUseManualCycle].forEach((el) => {
+      el.disabled = el.disabled || !isAdmin;
     });
 
     if (specComplete(a)) {
@@ -690,6 +703,23 @@
     specStrokeSeconds.disabled = !specUseManualCycle.checked;
   });
 
+  function addProductionLog(a, { machine, date, duration, units }) {
+    if (!duration || !units) return false;
+    a.logs.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      machine: (machine || "").trim(),
+      date: date || new Date().toISOString().slice(0, 10),
+      durationHours: duration,
+      units,
+      ts: Date.now(),
+    });
+    saveState();
+    if (machine && machine.trim()) localStorage.setItem("helfi_last_machine", machine.trim());
+    renderDetail();
+    renderList();
+    return true;
+  }
+
   document.getElementById("addLogBtn").addEventListener("click", () => {
     if (!isAdmin) return;
     const a = state.articles[selectedCode];
@@ -700,20 +730,22 @@
       logDuration.focus();
       return;
     }
-    a.logs.push({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      machine: logMachine.value.trim(),
-      date: logDate.value || new Date().toISOString().slice(0, 10),
-      durationHours: duration,
-      units,
-      ts: Date.now(),
-    });
-    saveState();
-    if (logMachine.value.trim()) localStorage.setItem("helfi_last_machine", logMachine.value.trim());
+    addProductionLog(a, { machine: logMachine.value, date: logDate.value, duration, units });
     logDuration.value = "12";
     logUnits.value = "";
-    renderDetail();
-    renderList();
+  });
+
+  document.getElementById("quickTraysBtn").addEventListener("click", () => {
+    if (!isAdmin) return;
+    const a = state.articles[selectedCode];
+    if (!a) return;
+    const units = Number(quickTraysInput.value);
+    if (!units) {
+      quickTraysInput.focus();
+      return;
+    }
+    const ok = addProductionLog(a, { duration: 12, units });
+    if (ok) quickTraysInput.value = "";
   });
 
   document.getElementById("deleteArticleBtn").addEventListener("click", () => {

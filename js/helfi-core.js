@@ -62,7 +62,7 @@
       };
     }
 
-    // "умен" темп от дневните производствени записи (units/час), без матрица
+    // "умен" темп от дневните производствени записи (units/час)
     const usable = (article.logs || []).filter((e) => e.durationHours > 0 && e.units > 0);
     if (usable.length > 0) {
       const rates = usable.map((e) => {
@@ -72,6 +72,15 @@
       const sorted = [...rates].sort((a, b) => a - b);
       const mid = Math.floor(sorted.length / 2);
       const value = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+      if (article.matrixCavities > 0) {
+        // знаем матрицата (гнезда на удар) -> смятаме реален цикъл на удар
+        return {
+          matrixCavities: article.matrixCavities,
+          strokeSeconds: (article.matrixCavities * 3600) / value,
+          bottlesPerHour: value,
+          source: "smart",
+        };
+      }
       return { matrixCavities: null, strokeSeconds: null, bottlesPerHour: value, source: "smart" };
     }
 

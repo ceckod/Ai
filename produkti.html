@@ -342,27 +342,36 @@
         <label><span class="unit-lbl-1cap">Тави</span> на пале
           <input type="number" id="specUnitsPerPallet" min="0" placeholder="напр. 13" />
         </label>
+        <label>Матрица (бутилки на удар)
+          <input type="number" id="specMatrixCavities" min="1" max="8" step="1" placeholder="напр. 3" />
+        </label>
       </div>
       <p class="spec-derived" id="specDerived"></p>
+      <p class="hint">ASB-50MB (кухини → макс. обем): 1→2.5л · 2→1.5л · 3→0.6л · 4→0.25л · 5→0.1л · 6→0.03л</p>
+
+      <div class="admin-only" hidden style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
+        <label style="display:block;margin-bottom:6px">Среден добив: <span class="unit-lbl-1">тави</span> за смяна (12ч)</label>
+        <div class="search-controls">
+          <input type="number" id="quickTraysInput" min="0" step="1" placeholder="напр. 34" style="max-width:140px" />
+          <button id="quickTraysBtn" class="btn">Добави → изчисли цикъл</button>
+        </div>
+        <p class="hint">Не знаеш точния цикъл, но знаеш средно колко <span class="unit-lbl-2">тави</span> излизат за смяна? Въведи го тук — записва се като запис от производство (12ч) и цикълът се преизчислява/уточнява автоматично (виж по-долу за пълния списък записи и по-фина ръчна дата/машина).</p>
+      </div>
     </div>
 
     <div class="card" style="background:var(--surface-2);margin-bottom:14px">
       <h3>Време за цикъл</h3>
-      <p class="card-sub">По подразбиране цикълът се смята автоматично от записите (умния код). Може и сам да го зададеш по матрицата на машината.</p>
+      <p class="card-sub">По подразбиране цикълът се смята автоматично от записите (умния код), като ползва матрицата зададена в „Опаковка“ по-горе. Може и сам да зададеш точното време на удар ръчно.</p>
       <div class="spec-grid">
         <label style="flex-direction:row;align-items:center;gap:8px">
           <input type="checkbox" id="specUseManualCycle" style="width:auto" />
           Ръчно зададен цикъл
-        </label>
-        <label>Матрица (бутилки на удар)
-          <input type="number" id="specMatrixCavities" min="1" max="6" step="1" placeholder="напр. 3" />
         </label>
         <label>Време за 1 удар (сек)
           <input type="number" id="specStrokeSeconds" step="0.1" min="0" placeholder="напр. 16" />
         </label>
       </div>
       <p class="spec-derived" id="cycleDerived"></p>
-      <p class="hint">ASB-50MB (кухини → макс. обем): 1→2.5л · 2→1.5л · 3→0.6л · 4→0.25л · 5→0.1л · 6→0.03л</p>
     </div>
 
     <div id="cycleLearningCard" class="card" style="background:var(--surface-2);margin-bottom:14px">
