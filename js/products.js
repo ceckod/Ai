@@ -226,8 +226,20 @@
   }
 
   function pushToFirestore() {
-    if (!fsDocRef) return;
-    fsDocRef.set({ json: JSON.stringify(state), updatedAt: Date.now() }).catch(() => setSyncStatus("error"));
+    if (!fsDocRef) {
+      alert("ДИАГНОСТИКА: fsDocRef липсва — Firebase изобщо не се е свързал в този момент.");
+      return;
+    }
+    fsDocRef
+      .set({ json: JSON.stringify(state), updatedAt: Date.now() })
+      .then(() => {
+        // видимо потвърждение, че записът РЕАЛНО е минал (не само тръгнал)
+        console.log("Firestore запис успешен:", new Date().toISOString());
+      })
+      .catch((err) => {
+        setSyncStatus("error");
+        alert("ДИАГНОСТИКА: записът към Firestore се провали.\n\nГрешка: " + (err && err.code ? err.code : "") + "\n" + (err && err.message ? err.message : String(err)));
+      });
   }
 
   // ---------------- helpers ----------------
