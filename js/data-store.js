@@ -96,71 +96,126 @@
   // ---------------- Firestore на живо (за ВСИЧКИ — не само за админ) ----------------
   // Целта: обикновен посетител (READ ONLY) вижда същите данни на живо, каквито
   // въвежда админът — не само последната ПУБЛИКУВАНА статична версия.
-  function ensureFirebaseApp() {
+  //
+  // ЗАБЕЛЕЖКА: тук нарочно НЕ ползваме Firebase JS SDK (firebase.firestore()).
+  // На някои мобилни мрежи SDK-то мълчаливо не успява да достигне сървъра —
+  // записите остават заклещени в локалния кеш ("fromCache: true") завинаги,
+  // без грешка. Вместо това ползваме директно Firestore REST API (обикновени
+  // HTTPS GET/PATCH заявки), които минават през нормални HTTP заявки и не
+  // разчитат на дълготраен streaming канал.
+  function restBaseUrl() {
     const cfg = global.HELFI_FIREBASE_CONFIG;
-    if (global.__dbg) global.__dbg("data-store.js: ensureFirebaseApp() стартира");
-    if (!cfg || !cfg.apiKey || typeof firebase === "undefined") {
-      if (global.__dbg) global.__dbg("data-store.js: ❌ прекратено рано — cfg=" + !!cfg + " typeof firebase=" + typeof firebase);
-      return null;
-    }
-    try {
-      if (!firebase.apps || !firebase.apps.length) {
-        if (global.__dbg) global.__dbg("data-store.js: извиквам firebase.initializeApp(...)");
-        firebase.initializeApp(cfg);
-        if (global.__dbg) global.__dbg("data-store.js: initializeApp() ОК, извиквам firebase.firestore()");
-        const db = firebase.firestore();
-        if (global.__dbg) global.__dbg("data-store.js: firebase.firestore() ОК, извиквам db.settings(...)");
-        // Някои мобилни мрежи/прокси чупят стандартната WebChannel/streaming
-        // връзка на Firestore (записите увисват в локалния кеш и никога не
-        // стигат до сървъра). Това трябва да се извика ПРЕДИ каквато и да е
-        // друга Firestore операция в цялото приложение — затова е тук, на
-        // мястото, където Firestore се докосва за пръв път.
-        try {
-          db.settings({ experimentalAutoDetectLongPolling: true, merge: true });
-          if (global.__dbg) global.__dbg("data-store.js: ✅ db.settings(experimentalAutoDetectLongPolling) приложени успешно");
-        } catch (settingsErr) {
-          if (global.__dbg) global.__dbg("data-store.js: ⚠ db.settings() хвърли: " + settingsErr.message);
-        }
-        return db;
+    if (!cfg || !cfg.apiKey || !cfg.projectId) return null;
+    return (
+      "https://firestore.googleapis.com/v1/projects/" +
+      cfg.projectId +
+      "/databases/(default)/documents/helfi_state/products?key=" +
+      encodeURIComponent(cfg.apiKey)
+    );
+  }
+
+  function restGetDoc() {
+    const url = restBaseUrl();
+    if (!url) return Promise.resolve(null);
+    return fetch(url, { cache: "no-store" })
+      .then((res) => {
+        if (res.status === 404) return null; // документът още не съществува
+        if (!res.ok) return Promise.reject(new Error("HTTP " + res.status));
+        return res.json();
+      })
+      .then((doc) => {
+        if (!doc || !doc.fields) return null;
+        const jsonStr = doc.fields.json && doc.fields.json.stringValue;
+        const updatedAt = doc.fields.updatedAt && Number(doc.fields.updatedAt.integerValue || doc.fields.updatedAt.doubleValue);
+        if (!jsonStr) return null;
+        return { json: jsonStr, updatedAt: updatedAt || null };
+      });
+  }
+
+  function restSetDoc(articles) {
+    const cfg = global.HELFI_FIREBASE_CONFIG;
+    const url = restBaseUrl();
+    if (!url) return Promise.reject(new Error("Firebase config липсва"));
+    const updatedAt = Date.now();
+    const body = {
+      fields: {
+        json: { stringValue: JSON.stringify({ articles }) },
+        updatedAt: { integerValue: String(updatedAt) },
+      },
+    };
+    return fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((res) => {
+      if (!res.ok) {
+        return res
+          .json()
+          .catch(() => ({}))
+          .then((errBody) => {
+            const msg = (errBody && errBody.error && errBody.error.message) || "HTTP " + res.status;
+            throw new Error(msg);
+          });
       }
-      if (global.__dbg) global.__dbg("data-store.js: firebase вече инициализиран другаде, apps.length=" + firebase.apps.length);
-      return firebase.firestore();
-    } catch (e) {
-      if (global.__dbg) global.__dbg("data-store.js: ❌ ensureFirebaseApp() хвърли изключение: " + e.message);
-      return null;
-    }
+      return { updatedAt };
+    });
+  }
+
+  let livePollTimer = null;
+  let lastKnownUpdatedAt = null;
+
+  function pollOnce() {
+    return restGetDoc()
+      .then((remote) => {
+        if (!remote) return;
+        const parsed = safeParse(remote.json, null);
+        if (!parsed || !parsed.articles) return;
+        if (remote.updatedAt && remote.updatedAt === lastKnownUpdatedAt) return; // без промяна
+        lastKnownUpdatedAt = remote.updatedAt;
+        liveSyncReceived = true;
+        centralArticles = parsed.articles;
+        centralUpdatedAt = remote.updatedAt || null;
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ articles: centralArticles, updatedAt: centralUpdatedAt }));
+        } catch (e) {
+          /* пълен localStorage — не е фатално */
+        }
+        notifyUpdate();
+        if (global.__dbg) global.__dbg("data-store.js: REST poll → нови данни, updatedAt=" + remote.updatedAt);
+      })
+      .catch((e) => {
+        if (global.__dbg) global.__dbg("data-store.js: ⚠ REST poll грешка: " + e.message);
+      });
   }
 
   function initLiveSync() {
-    if (global.__dbg) global.__dbg("data-store.js: initLiveSync() стартира");
-    const db = ensureFirebaseApp();
-    if (!db) return;
-    try {
-      const ref = db.collection("helfi_state").doc("products");
-      ref.onSnapshot(
-        (snap) => {
-          if (!snap.exists) return;
-          const remote = snap.data();
-          if (!remote || !remote.json) return;
-          const parsed = safeParse(remote.json, null);
-          if (!parsed || !parsed.articles) return;
-          liveSyncReceived = true;
-          centralArticles = parsed.articles;
-          centralUpdatedAt = remote.updatedAt || null;
-          try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify({ articles: centralArticles, updatedAt: centralUpdatedAt }));
-          } catch (e) {
-            /* пълен localStorage — не е фатално */
-          }
-          notifyUpdate();
-        },
-        () => {
-          /* облакът не отговаря -> просто оставаме на статичния файл/кеша */
-        }
-      );
-    } catch (e) {
-      /* Firestore недостъпен -> оставаме на статичния файл/кеша */
+    if (global.__dbg) global.__dbg("data-store.js: initLiveSync() (REST режим) стартира");
+    const cfg = global.HELFI_FIREBASE_CONFIG;
+    if (!cfg || !cfg.apiKey || !cfg.projectId) {
+      if (global.__dbg) global.__dbg("data-store.js: ❌ Firebase config липсва — REST sync изключен");
+      return;
     }
+    pollOnce(); // веднага при старт
+    if (livePollTimer) clearInterval(livePollTimer);
+    livePollTimer = setInterval(pollOnce, 5000); // после на всеки 5 сек
+  }
+
+  // saveCentralRest се вика от products.js вместо старото pushToFirestore(),
+  // за да не разчита на SDK-то, което е ненадеждно на някои мрежи.
+  function saveCentralRest(articles) {
+    if (global.__dbg) global.__dbg("data-store.js: saveCentralRest() — изпращам PATCH заявка");
+    return restSetDoc(articles).then((res) => {
+      lastKnownUpdatedAt = res.updatedAt;
+      centralArticles = articles;
+      centralUpdatedAt = res.updatedAt;
+      liveSyncReceived = true;
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ articles, updatedAt: res.updatedAt }));
+      } catch (e) {
+        /* пълен localStorage — не е фатално */
+      }
+      return res;
+    });
   }
 
   // ---------------- скрит админ режим ----------------
@@ -236,6 +291,7 @@
     currentArticles,
     exportPublishedFile,
     onCentralUpdate,
+    saveCentralRest,
   };
 
   // започваме зареждането веднага при включване на скрипта, за да е готово

@@ -168,7 +168,6 @@
     pushToFirestore();
   }
 
-  let fsDocRef = null;
   let state = buildState();
   let selectedCode = null;
   let activeCategory = "all";
@@ -197,84 +196,57 @@
   }
 
   function initFirestore() {
-    dbg("initFirestore() стартирана");
+    dbg("initFirestore() (REST режим) стартирана");
     const cfg = window.HELFI_FIREBASE_CONFIG;
-    dbg("HELFI_FIREBASE_CONFIG = " + (cfg ? "наличен, apiKey=" + (cfg.apiKey ? cfg.apiKey.slice(0, 8) + "…" : "❌ ЛИПСВА") + ", projectId=" + cfg.projectId : "❌ ЛИПСВА ИЗЦЯЛО"));
-    dbg("typeof firebase = " + typeof firebase);
-    if (!cfg || !cfg.apiKey || typeof firebase === "undefined") {
-      dbg("❌ initFirestore() прекратена рано — firebase SDK или config липсват. Firestore НИКОГА няма да се използва.");
+    dbg("HELFI_FIREBASE_CONFIG = " + (cfg ? "наличен, projectId=" + cfg.projectId : "❌ ЛИПСВА"));
+    if (!cfg || !cfg.apiKey) {
+      dbg("❌ initFirestore() прекратена рано — config липсва.");
       return;
     }
-    try {
-      setSyncStatus("connecting");
-      if (!firebase.apps || !firebase.apps.length) {
-        dbg("извиквам firebase.initializeApp(...)");
-        firebase.initializeApp(cfg);
-      } else {
-        dbg("firebase вече е инициализиран (apps.length=" + firebase.apps.length + ")");
-      }
-      const db = firebase.firestore();
-      fsDocRef = db.collection("helfi_state").doc("products");
-      dbg("fsDocRef създаден успешно, закачам onSnapshot слушател");
-      fsDocRef.onSnapshot(
-        (snap) => {
-          dbg("📡 onSnapshot задейства. snap.exists=" + snap.exists + " fromCache=" + (snap.metadata ? snap.metadata.fromCache : "?"));
-          setSyncStatus("synced");
-          if (!snap.exists) {
-            dbg("документът helfi_state/products НЕ съществува в облака.");
-            if (isAdmin) {
-              dbg("(admin съм) → извиквам pushToFirestore() за да го създам");
-              pushToFirestore();
-            }
-            return;
-          }
-          const remote = snap.data();
-          if (remote && remote.json) {
-            dbg("получени данни от облака, updatedAt=" + remote.updatedAt);
-            state = JSON.parse(remote.json);
-            Object.keys(state.articles).forEach((code) => {
-              if (needsMigration(state.articles[code])) {
-                state.articles[code] = migrateArticle(state.articles[code]);
-              }
-            });
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-            if (data && isAdmin) data.saveDraft(state.articles);
-            renderList();
-            if (selectedCode && state.articles[selectedCode]) renderDetail();
-          }
-        },
-        (err) => {
-          dbg("❌ onSnapshot ГРЕШКА: " + (err && err.code) + " " + (err && err.message));
-          setSyncStatus("error");
-        }
-      );
-    } catch (e) {
-      dbg("❌ initFirestore() хвърли изключение: " + e.message);
-      setSyncStatus("error");
+    setSyncStatus("connecting");
+    // четенето/поллинга се извършва централно в data-store.js (REST, на всеки
+    // 5 сек) — тук просто се абонираме за известия и опресняваме изгледа
+    if (data && data.onCentralUpdate) {
+      data.onCentralUpdate(() => {
+        dbg("📡 onCentralUpdate (REST poll) — опресняване на списъка");
+        setSyncStatus("synced");
+        const fresh = data.currentArticles();
+        state = { articles: normalizeArticles(fresh) };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        renderList();
+        if (selectedCode && state.articles[selectedCode]) renderDetail();
+      });
     }
+    // ако документът още не съществува в облака, "засяваме" го веднъж
+    if (isAdmin && data && data.saveCentralRest) {
+      dbg("(admin съм) — проверявам/засявам облачния документ при нужда чрез pushToFirestore()");
+      pushToFirestore();
+    }
+    setSyncStatus("synced");
   }
 
   function pushToFirestore() {
-    dbg("pushToFirestore() извикана. fsDocRef=" + (fsDocRef ? "наличен" : "❌ null"));
-    if (!fsDocRef) {
-      if (saveConfirmEl) saveConfirmEl.textContent = "⚠ ДИАГНОСТИКА: fsDocRef липсва — Firebase не се е свързал";
-      if (window.__helfiShowBanner) window.__helfiShowBanner("Firebase не е свързан (fsDocRef липсва)", false);
+    dbg("pushToFirestore() (REST) извикана");
+    if (!data || !data.saveCentralRest) {
+      dbg("❌ data.saveCentralRest липсва");
+      if (saveConfirmEl) saveConfirmEl.textContent = "⚠ ДИАГНОСТИКА: REST функцията липсва";
       return;
     }
-    dbg("извиквам fsDocRef.set(...) — изпращам " + JSON.stringify(state).length + " символа");
-    fsDocRef
-      .set({ json: JSON.stringify(state), updatedAt: Date.now() })
-      .then(() => {
-        dbg("✅ fsDocRef.set() РЕЗОЛВНА УСПЕШНО");
+    dbg("извиквам data.saveCentralRest(...) — изпращам " + JSON.stringify(state.articles).length + " символа");
+    data
+      .saveCentralRest(state.articles)
+      .then((res) => {
+        dbg("✅ REST PATCH УСПЕШЕН, updatedAt=" + res.updatedAt);
         if (saveConfirmEl) {
-          saveConfirmEl.textContent = "✅ ПОТВЪРДЕНО от Firestore в " + new Date().toLocaleTimeString("bg-BG");
+          saveConfirmEl.textContent = "✅ ПОТВЪРДЕНО от Firestore (REST) в " + new Date().toLocaleTimeString("bg-BG");
         }
-        if (window.__helfiShowBanner) window.__helfiShowBanner("ПОТВЪРДЕНО: записът пристигна в Firestore в " + new Date().toLocaleTimeString("bg-BG"), true);
+        if (window.__helfiShowBanner) window.__helfiShowBanner("ПОТВЪРДЕНО (REST): записът пристигна в Firestore в " + new Date().toLocaleTimeString("bg-BG"), true);
+        setSyncStatus("synced");
       })
       .catch((err) => {
-        dbg("❌ fsDocRef.set() ОТХВЪРЛЕН: code=" + (err && err.code) + " message=" + (err && err.message));
+        dbg("❌ REST PATCH ОТХВЪРЛЕН: " + (err && err.message));
         setSyncStatus("error");
-        const msg = "ГРЕШКА (" + (err && err.code ? err.code : "?") + "): " + (err && err.message ? err.message : String(err));
+        const msg = "ГРЕШКА: " + (err && err.message ? err.message : String(err));
         if (saveConfirmEl) saveConfirmEl.textContent = "❌ " + msg;
         if (window.__helfiShowBanner) window.__helfiShowBanner(msg, false);
       });
@@ -759,7 +731,7 @@
   saveArticleBtn.addEventListener("click", () => {
     if (!isAdmin || !selectedCode) return;
     saveSpec();
-    saveConfirmEl.textContent = fsDocRef ? "⏳ Запазено локално, изпращам в облака…" : "✅ Запазено локално (Firebase не е свързан)";
+    saveConfirmEl.textContent = "⏳ Запазено локално, изпращам в облака…";
     // текстът вече НЕ изчезва автоматично — pushToFirestore() ще го презапише
     // с реалния резултат (успех/грешка), за да е ясно видим за диагностика
   });
