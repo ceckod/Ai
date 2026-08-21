@@ -722,10 +722,9 @@
   saveArticleBtn.addEventListener("click", () => {
     if (!isAdmin || !selectedCode) return;
     saveSpec();
-    saveConfirmEl.textContent = fsDocRef ? "✅ Запазено и изпратено в облака" : "✅ Запазено локално";
-    setTimeout(() => {
-      if (saveConfirmEl.textContent.startsWith("✅")) saveConfirmEl.textContent = "";
-    }, 3000);
+    saveConfirmEl.textContent = fsDocRef ? "⏳ Запазено локално, изпращам в облака…" : "✅ Запазено локално (Firebase не е свързан)";
+    // текстът вече НЕ изчезва автоматично — pushToFirestore() ще го презапише
+    // с реалния резултат (успех/грешка), за да е ясно видим за диагностика
   });
 
   specUseManualCycle.addEventListener("change", () => {
