@@ -16,6 +16,7 @@
 //     редакциите на отключен админ се пазят като локална чернова
 //     (localStorage) само на неговото устройство, докато не бъде публикувана.
 (function (global) {
+  if (global.__dbg) global.__dbg("data-store.js: файлът стартира изпълнение (най-горе)");
   const CENTRAL_URL = "data/products-data.json";
   const CACHE_KEY = "helfi_central_cache_v1"; // офлайн резервно копие на публикуваните данни
   const DRAFT_KEY = "helfi_admin_draft_v1"; // чернова на админа (само в неговия браузър)
@@ -97,11 +98,18 @@
   // въвежда админът — не само последната ПУБЛИКУВАНА статична версия.
   function ensureFirebaseApp() {
     const cfg = global.HELFI_FIREBASE_CONFIG;
-    if (!cfg || !cfg.apiKey || typeof firebase === "undefined") return null;
+    if (global.__dbg) global.__dbg("data-store.js: ensureFirebaseApp() стартира");
+    if (!cfg || !cfg.apiKey || typeof firebase === "undefined") {
+      if (global.__dbg) global.__dbg("data-store.js: ❌ прекратено рано — cfg=" + !!cfg + " typeof firebase=" + typeof firebase);
+      return null;
+    }
     try {
       if (!firebase.apps || !firebase.apps.length) {
+        if (global.__dbg) global.__dbg("data-store.js: извиквам firebase.initializeApp(...)");
         firebase.initializeApp(cfg);
+        if (global.__dbg) global.__dbg("data-store.js: initializeApp() ОК, извиквам firebase.firestore()");
         const db = firebase.firestore();
+        if (global.__dbg) global.__dbg("data-store.js: firebase.firestore() ОК, извиквам db.settings(...)");
         // Някои мобилни мрежи/прокси чупят стандартната WebChannel/streaming
         // връзка на Firestore (записите увисват в локалния кеш и никога не
         // стигат до сървъра). Това трябва да се извика ПРЕДИ каквато и да е
@@ -109,19 +117,22 @@
         // мястото, където Firestore се докосва за пръв път.
         try {
           db.settings({ experimentalAutoDetectLongPolling: true, merge: true });
-          if (global.__dbg) global.__dbg("data-store.js: db.settings(experimentalAutoDetectLongPolling) приложени");
+          if (global.__dbg) global.__dbg("data-store.js: ✅ db.settings(experimentalAutoDetectLongPolling) приложени успешно");
         } catch (settingsErr) {
-          if (global.__dbg) global.__dbg("⚠ data-store.js: db.settings() хвърли: " + settingsErr.message);
+          if (global.__dbg) global.__dbg("data-store.js: ⚠ db.settings() хвърли: " + settingsErr.message);
         }
         return db;
       }
+      if (global.__dbg) global.__dbg("data-store.js: firebase вече инициализиран другаде, apps.length=" + firebase.apps.length);
       return firebase.firestore();
     } catch (e) {
+      if (global.__dbg) global.__dbg("data-store.js: ❌ ensureFirebaseApp() хвърли изключение: " + e.message);
       return null;
     }
   }
 
   function initLiveSync() {
+    if (global.__dbg) global.__dbg("data-store.js: initLiveSync() стартира");
     const db = ensureFirebaseApp();
     if (!db) return;
     try {
