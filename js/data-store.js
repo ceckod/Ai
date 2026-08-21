@@ -99,7 +99,22 @@
     const cfg = global.HELFI_FIREBASE_CONFIG;
     if (!cfg || !cfg.apiKey || typeof firebase === "undefined") return null;
     try {
-      if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(cfg);
+      if (!firebase.apps || !firebase.apps.length) {
+        firebase.initializeApp(cfg);
+        const db = firebase.firestore();
+        // Някои мобилни мрежи/прокси чупят стандартната WebChannel/streaming
+        // връзка на Firestore (записите увисват в локалния кеш и никога не
+        // стигат до сървъра). Това трябва да се извика ПРЕДИ каквато и да е
+        // друга Firestore операция в цялото приложение — затова е тук, на
+        // мястото, където Firestore се докосва за пръв път.
+        try {
+          db.settings({ experimentalAutoDetectLongPolling: true, merge: true });
+          if (global.__dbg) global.__dbg("data-store.js: db.settings(experimentalAutoDetectLongPolling) приложени");
+        } catch (settingsErr) {
+          if (global.__dbg) global.__dbg("⚠ data-store.js: db.settings() хвърли: " + settingsErr.message);
+        }
+        return db;
+      }
       return firebase.firestore();
     } catch (e) {
       return null;
