@@ -228,6 +228,7 @@
   function pushToFirestore() {
     if (!fsDocRef) {
       if (saveConfirmEl) saveConfirmEl.textContent = "⚠ ДИАГНОСТИКА: fsDocRef липсва — Firebase не се е свързал";
+      if (window.__helfiShowBanner) window.__helfiShowBanner("⚠ Firebase не е свързан (fsDocRef липсва)", false);
       return;
     }
     fsDocRef
@@ -236,11 +237,13 @@
         if (saveConfirmEl) {
           saveConfirmEl.textContent = "✅ ПОТВЪРДЕНО от Firestore в " + new Date().toLocaleTimeString("bg-BG");
         }
+        if (window.__helfiShowBanner) window.__helfiShowBanner("✅ ПОТВЪРДЕНО: записът пристигна в Firestore в " + new Date().toLocaleTimeString("bg-BG"), true);
       })
       .catch((err) => {
         setSyncStatus("error");
         const msg = "❌ ГРЕШКА (" + (err && err.code ? err.code : "?") + "): " + (err && err.message ? err.message : String(err));
         if (saveConfirmEl) saveConfirmEl.textContent = msg;
+        if (window.__helfiShowBanner) window.__helfiShowBanner(msg, false);
       });
   }
 
