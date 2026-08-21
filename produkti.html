@@ -276,24 +276,67 @@
 </style>
 </head>
 <body>
-<div id="jsErrorBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#c0392b;color:#fff;padding:10px;font:13px/1.4 monospace;white-space:pre-wrap;max-height:40vh;overflow:auto;"></div>
+<div id="helfiDebugPanel" style="position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#111;color:#0f0;font:11px/1.4 monospace;max-height:45vh;overflow-y:auto;border-top:3px solid #0f0;">
+  <div style="display:flex;justify-content:space-between;align-items:center;background:#222;padding:6px 10px;position:sticky;top:0;">
+    <b style="color:#fff;">🔧 HELFI ДНЕВНИК (последно долу)</b>
+    <span>
+      <button id="helfiDbgCopy" style="margin-right:6px;">Копирай</button>
+      <button id="helfiDbgClear">Изчисти</button>
+      <button id="helfiDbgToggle">Скрий</button>
+    </span>
+  </div>
+  <div id="helfiDebugLog" style="padding:6px 10px;white-space:pre-wrap;word-break:break-word;"></div>
+</div>
 <script>
   (function () {
-    var banner = document.getElementById("jsErrorBanner");
-    function show(msg) {
-      banner.style.display = "block";
-      banner.textContent += (banner.textContent ? "\n\n" : "") + msg;
+    var logEl = document.getElementById("helfiDebugLog");
+    var panel = document.getElementById("helfiDebugPanel");
+    var lines = [];
+    function ts() {
+      var d = new Date();
+      return d.toLocaleTimeString("bg-BG", { hour12: false }) + "." + String(d.getMilliseconds()).padStart(3, "0");
     }
+    window.__dbg = function (msg) {
+      var line = "[" + ts() + "] " + msg;
+      lines.push(line);
+      logEl.textContent += (logEl.textContent ? "\n" : "") + line;
+      panel.scrollTop = panel.scrollHeight;
+      try { console.log(line); } catch (e) {}
+    };
+    document.getElementById("helfiDbgClear").addEventListener("click", function () {
+      lines = [];
+      logEl.textContent = "";
+    });
+    document.getElementById("helfiDbgToggle").addEventListener("click", function (e) {
+      var body = document.getElementById("helfiDebugLog");
+      if (body.style.display === "none") {
+        body.style.display = "block";
+        e.target.textContent = "Скрий";
+      } else {
+        body.style.display = "none";
+        e.target.textContent = "Покажи";
+      }
+    });
+    document.getElementById("helfiDbgCopy").addEventListener("click", function () {
+      var text = lines.join("\n");
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          function () { alert("Копирано! Постави го тук за мен."); },
+          function () { prompt("Копирай ръчно целия текст:", text); }
+        );
+      } else {
+        prompt("Копирай ръчно целия текст:", text);
+      }
+    });
     window.addEventListener("error", function (e) {
-      show("JS ГРЕШКА: " + e.message + "\n(" + e.filename + ":" + e.lineno + ":" + e.colno + ")");
+      window.__dbg("❌ JS ГРЕШКА: " + e.message + " (" + e.filename + ":" + e.lineno + ":" + e.colno + ")");
     });
     window.addEventListener("unhandledrejection", function (e) {
-      show("НЕОБРАБОТЕНА ГРЕШКА (Promise): " + (e.reason && e.reason.message ? e.reason.message : String(e.reason)));
+      window.__dbg("❌ НЕОБРАБОТЕНА ГРЕШКА (Promise): " + (e.reason && e.reason.message ? e.reason.message : String(e.reason)));
     });
+    window.__dbg("=== Дневникът стартира. Страница: " + location.href + " ===");
     window.__helfiShowBanner = function (msg, ok) {
-      banner.style.background = ok ? "#1e8e3e" : "#c0392b";
-      banner.style.display = "block";
-      banner.textContent = msg;
+      window.__dbg((ok ? "✅ " : "❌ ") + msg);
     };
   })();
 </script>
@@ -464,12 +507,12 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="js/firebase-config.js?v=1787272184"></script>
-<script src="js/clock.js?v=1787272184"></script>
-<script src="js/sw-register.js?v=1787272184"></script>
-<script src="js/data-store.js?v=1787272184"></script>
-<script src="js/helfi-core.js?v=1787272184"></script>
-<script src="js/products.js?v=1787272184"></script>
-<script src="js/agent.js?v=1787272184"></script>
+<script src="js/firebase-config.js?v=1787272738"></script>
+<script src="js/clock.js?v=1787272738"></script>
+<script src="js/sw-register.js?v=1787272738"></script>
+<script src="js/data-store.js?v=1787272738"></script>
+<script src="js/helfi-core.js?v=1787272738"></script>
+<script src="js/products.js?v=1787272738"></script>
+<script src="js/agent.js?v=1787272738"></script>
 </body>
 </html>
